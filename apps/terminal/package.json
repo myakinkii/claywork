@@ -1,0 +1,17 @@
+{
+  "name": "@claywork/terminal",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Play and fire worlds from the terminal.",
+  "dependencies": {
+    "@claywork/clay": "*",
+    "@claywork/wheel": "*",
+    "@claywork/kiln": "*",
+    "@claywork/glaze": "*",
+    "@claywork/reflex": "*",
+    "@claywork/reason": "*",
+    "@claywork/golems": "*",
+    "@claywork/slip": "*"
+  }
+}

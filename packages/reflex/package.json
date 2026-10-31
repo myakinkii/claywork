@@ -1,0 +1,7 @@
+{
+  "name": "@claywork/reflex",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Model-agnostic System One interface (Choice / Score / Noul) plus a fake.",
+  "exports": { ".": "./src/index.ts" }
+}

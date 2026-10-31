@@ -1,0 +1,8 @@
+{
+  "name": "@claywork/golems",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "NPC minds: policies, deadlines, fallbacks. Animated by reflex and reason.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@claywork/clay": "*", "@claywork/wheel": "*", "@claywork/reflex": "*", "@claywork/reason": "*" }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "@claywork/reason",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Model-agnostic System Two interface (language models) plus a fake.",
+  "exports": { ".": "./src/index.ts" }
+}

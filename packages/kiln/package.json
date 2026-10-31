@@ -1,0 +1,8 @@
+{
+  "name": "@claywork/kiln",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Validator and simulator: fires scenarios and reveals the cracks.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@claywork/clay": "*", "@claywork/wheel": "*" }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "@claywork/slip",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "The event bus: joins things together and decides who perceives what.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@claywork/clay": "*" }
+}

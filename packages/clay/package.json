@@ -1,0 +1,7 @@
+{
+  "name": "@claywork/clay",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Schemas: things, traits, glyphs, intents, events. The material everything is made of.",
+  "exports": { ".": "./src/index.ts" }
+}

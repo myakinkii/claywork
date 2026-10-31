@@ -1,0 +1,8 @@
+{
+  "name": "@claywork/glyphs",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "The scripting DSL interpreter: conditions and effects carved into the clay.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@claywork/clay": "*" }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "@claywork/glaze",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "The hypertext renderer: the surface people see and touch.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@claywork/clay": "*" }
+}

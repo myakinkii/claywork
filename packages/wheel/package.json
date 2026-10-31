@@ -1,0 +1,8 @@
+{
+  "name": "@claywork/wheel",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "The tick loop, verbs and the single authority that resolves intents.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@claywork/clay": "*", "@claywork/slip": "*", "@claywork/glyphs": "*" }
+}

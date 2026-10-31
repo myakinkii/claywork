@@ -1,0 +1,205 @@
+{
+  "id": "drowned-cellar",
+  "title": "The Drowned Cellar",
+  "intro": "You descend from the rain into an old potter's house. Somewhere below, they say, a heart of clay still beats.",
+  "spawn": "stairwell",
+  "things": [
+    {
+      "id": "stairwell",
+      "name": "stairwell",
+      "location": null,
+      "description": "Wet stone steps spiral down into the dark. Rainwater trickles past your boots.",
+      "traits": { "room": { "title": "Stairwell" } }
+    },
+    {
+      "id": "stairs_down",
+      "name": "stone steps",
+      "location": "stairwell",
+      "description": "Slick steps leading down. You hear water lapping below.",
+      "traits": { "exit": { "to": "cellar", "direction": "down" } }
+    },
+    {
+      "id": "old_shovel",
+      "name": "old shovel",
+      "location": "stairwell",
+      "description": "A potter's clay shovel, its edge still sharp enough to hurt.",
+      "traits": { "takeable": {}, "weapon": { "damage": 4 } }
+    },
+
+    {
+      "id": "cellar",
+      "name": "cellar",
+      "location": null,
+      "description": "Ankle-deep black water covers the floor. An iron chest squats against one wall; an iron door is set into the east wall. One brick near the floor sits a little crooked.",
+      "traits": { "room": { "title": "Flooded Cellar" } }
+    },
+    {
+      "id": "stairs_up",
+      "name": "stone steps",
+      "location": "cellar",
+      "traits": { "exit": { "to": "stairwell", "direction": "up" } }
+    },
+    {
+      "id": "crypt_door",
+      "name": "iron door",
+      "location": "cellar",
+      "description": "Heavy iron, cold to the touch, with a rusted keyhole.",
+      "traits": {
+        "exit": { "to": "crypt", "direction": "east" },
+        "openable": { "open": false },
+        "lockable": { "locked": true, "key": "rusty_key" }
+      }
+    },
+    {
+      "id": "iron_chest",
+      "name": "iron chest",
+      "location": "cellar",
+      "description": "A squat iron chest, half sunk in the water. The lid isn't locked, just heavy.",
+      "traits": { "container": {}, "openable": { "open": false } }
+    },
+    {
+      "id": "rusty_key",
+      "name": "rusty key",
+      "location": "iron_chest",
+      "description": "A key flaked with orange rust.",
+      "traits": { "takeable": {} }
+    },
+    {
+      "id": "loose_brick",
+      "name": "crooked brick",
+      "location": "cellar",
+      "description": "On closer inspection the brick is loose. You push it, and it slides inward.",
+      "traits": {}
+    },
+    {
+      "id": "niche_passage",
+      "name": "narrow gap",
+      "location": "cellar",
+      "description": "A gap where the wall used to be, barely wide enough to squeeze through.",
+      "traits": { "exit": { "to": "niche", "direction": "into the gap", "hidden": true } }
+    },
+    {
+      "id": "goblin",
+      "name": "goblin",
+      "location": "cellar",
+      "description": "A wiry goblin with a chipped dagger, standing guard in front of the iron door.",
+      "traits": {
+        "actor": {
+          "kind": "mob",
+          "persona": "A cowardly but greedy goblin. Fights when cornered, flees when badly hurt.",
+          "goal": "Guard the iron door. Attack intruders who come close."
+        },
+        "vitals": { "hp": 8, "maxHp": 8 }
+      }
+    },
+    {
+      "id": "goblin_dagger",
+      "name": "chipped dagger",
+      "location": "goblin",
+      "description": "A short, chipped blade.",
+      "traits": { "takeable": {}, "weapon": { "damage": 2 } }
+    },
+
+    {
+      "id": "niche",
+      "name": "niche",
+      "location": null,
+      "description": "A tight, dry space behind the wall. Someone scratched words into the plaster here.",
+      "traits": { "room": { "title": "Narrow Niche" } }
+    },
+    {
+      "id": "niche_out",
+      "name": "narrow gap",
+      "location": "niche",
+      "traits": { "exit": { "to": "cellar", "direction": "back out" } }
+    },
+    {
+      "id": "scratched_words",
+      "name": "scratched words",
+      "location": "niche",
+      "description": "\"The heart sleeps behind iron. The guard is a coward: hurt him, and he runs.\"",
+      "traits": {}
+    },
+
+    {
+      "id": "crypt",
+      "name": "crypt",
+      "location": null,
+      "description": "Shelves of small clay figures line the walls, hundreds of them, each one different. In the middle stands a low stone altar.",
+      "traits": { "room": { "title": "Clay Crypt" } }
+    },
+    {
+      "id": "crypt_out",
+      "name": "iron door",
+      "location": "crypt",
+      "traits": { "exit": { "to": "cellar", "direction": "west" } }
+    },
+    {
+      "id": "altar",
+      "name": "stone altar",
+      "location": "crypt",
+      "description": "A low altar, worn smooth by hands.",
+      "traits": { "container": { "transparent": true } }
+    },
+    {
+      "id": "clay_heart",
+      "name": "clay heart",
+      "location": "altar",
+      "description": "A fist-sized heart of unfired clay. It is warm, and very faintly, it beats.",
+      "traits": { "takeable": {} }
+    }
+  ],
+  "triggers": [
+    {
+      "id": "brick_secret",
+      "on": "look",
+      "target": "loose_brick",
+      "once": true,
+      "then": [
+        { "reveal": "niche_passage" },
+        { "say": "With a dry scrape, a narrow gap opens in the wall." }
+      ]
+    },
+    {
+      "id": "goblin_guards_door",
+      "on": "unlock",
+      "phase": "before",
+      "target": "crypt_door",
+      "if": [{ "prop": ["goblin", "vitals.hp"], "gt": 0 }, { "at": ["goblin", "cellar"] }],
+      "then": [
+        { "say": "The goblin hisses and shoves you away from the door." },
+        { "block": true }
+      ]
+    },
+    {
+      "id": "crypt_warmth",
+      "on": "enter",
+      "target": "crypt",
+      "once": true,
+      "then": [{ "say": "The air in here is warm, like a kiln long after the fire went out.", "to": "actor" }]
+    },
+    {
+      "id": "heart_taken",
+      "on": "take",
+      "target": "clay_heart",
+      "once": true,
+      "then": [
+        { "say": "As the heart leaves the altar, every clay figure on the shelves turns its head toward you." },
+        { "setFlag": "heart_taken" }
+      ]
+    }
+  ],
+  "goal": { "has": ["$actor", "clay_heart"] },
+  "walkthrough": [
+    { "verb": "take", "target": "old_shovel" },
+    { "verb": "go", "target": "stairs_down" },
+    { "verb": "attack", "target": "goblin" },
+    { "verb": "attack", "target": "goblin" },
+    { "verb": "open", "target": "iron_chest" },
+    { "verb": "take", "target": "rusty_key" },
+    { "verb": "unlock", "target": "crypt_door", "with": "rusty_key" },
+    { "verb": "open", "target": "crypt_door" },
+    { "verb": "go", "target": "crypt_door" },
+    { "verb": "take", "target": "clay_heart" }
+  ]
+}
