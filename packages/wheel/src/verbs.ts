@@ -19,6 +19,14 @@ export interface Performed {
  */
 export interface Verb {
   name: string;
+  /** One line for /help, world independent. */
+  summary: string;
+  /** How to type it, e.g. "take <thing>". */
+  usage: string;
+  /** Other words players may type: "get" for take, "l" for look. */
+  aliases?: string[];
+  /** Takes free text instead of a target (say). Such verbs have no options. */
+  freeText?: boolean;
   options(world: World, actor: Id): Option[];
   /** Why the intent cannot happen, or null if it can. Must not mutate. */
   check(ctx: VerbContext): string | null;
@@ -77,6 +85,9 @@ export function weaponOf(world: World, actor: Id): { thing?: Thing; damage: numb
 
 const look: Verb = {
   name: "look",
+  summary: "Look around, or examine something closely. Details sometimes reveal secrets.",
+  usage: "look [thing]",
+  aliases: ["l", "examine", "x"],
   options(world, actor) {
     const around = option(actor, "look", undefined, "look around", "Look around the room. Safe, but the moment passes.");
     return [
@@ -102,6 +113,9 @@ const look: Verb = {
 
 const go: Verb = {
   name: "go",
+  summary: "Leave through an exit.",
+  usage: "go <direction>",
+  aliases: ["walk", "move"],
   options(world, actor) {
     const room = world.roomOf(actor);
     if (!room) return [];
@@ -146,6 +160,9 @@ const go: Verb = {
 
 const take: Verb = {
   name: "take",
+  summary: "Pick something up and carry it.",
+  usage: "take <thing>",
+  aliases: ["get", "grab"],
   options(world, actor) {
     return world
       .reachable(actor)
@@ -170,6 +187,8 @@ const take: Verb = {
 
 const drop: Verb = {
   name: "drop",
+  summary: "Put something you carry down.",
+  usage: "drop <thing>",
   options(world, actor) {
     return world.children(actor).map((t) => option(actor, "drop", t, `drop ${t.name}`, `Put ${the(t)} down here.`));
   },
@@ -193,6 +212,8 @@ function toggle(name: "open" | "close", open: boolean): Verb {
   const past = open ? "opens" : "closes";
   return {
     name,
+    summary: open ? "Open a door, a chest or anything else that opens." : "Close something that is open.",
+    usage: `${name} <thing>`,
     options(world, actor) {
       return touchable(world, actor)
         .filter((t) => t.traits.openable && t.traits.openable.open !== open)
@@ -229,6 +250,8 @@ function toggle(name: "open" | "close", open: boolean): Verb {
 
 const unlock: Verb = {
   name: "unlock",
+  summary: "Unlock something, if you carry the right key.",
+  usage: "unlock <thing>",
   options(world, actor) {
     const keys = new Set(world.carried(actor).map((t) => t.id));
     return touchable(world, actor)
@@ -262,6 +285,9 @@ const unlock: Verb = {
 
 const attack: Verb = {
   name: "attack",
+  summary: "Strike someone with the best weapon you carry. They may strike back.",
+  usage: "attack <someone>",
+  aliases: ["hit", "kill", "fight"],
   options(world, actor) {
     const weapon = weaponOf(world, actor);
     const using = weapon.thing ? ` with ${the(weapon.thing)}` : " with bare hands";
@@ -308,6 +334,9 @@ const attack: Verb = {
 
 const say: Verb = {
   name: "say",
+  summary: "Speak aloud. Everyone in the room hears you, and some may answer.",
+  usage: "say <words>   (or just start with ')",
+  freeText: true,
   // Free text: players type it, golems speak through their reasoning model. Never a plain option.
   options: () => [],
   check: ({ intent }) => (intent.text?.trim() ? null : "Say what?"),
@@ -322,6 +351,9 @@ const say: Verb = {
 
 const wait: Verb = {
   name: "wait",
+  summary: "Do nothing for a moment.",
+  usage: "wait",
+  aliases: ["z"],
   options: (_world, actor) => [option(actor, "wait", undefined, "wait", "Do nothing for a moment.")],
   check: () => null,
   perform: () => ({ events: [] }),

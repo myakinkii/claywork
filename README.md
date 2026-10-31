@@ -49,7 +49,15 @@ npm run play          # play it in the terminal, in real time
 NAME=Anna TICK_MS=1500 npm run play
 ```
 
-In the terminal: type a number (or an option's label) to act, `say <words>` to talk, Enter to look again, `q` to quit. The goblin is driven by `reflexPolicy` over `FakeReflex`, with `brute` as fallback, and answers speech through `FakeReason`.
+In the terminal: type a number or a command (`take shovel`, `x brick`, `down`, `'hello`), `/help` for an overview, Enter to look again, `/quit` to leave.
+
+Input has three layers, kept apart on purpose:
+
+- **meta commands** (`/help`, `/quit`) talk to the client, never to the world;
+- **verbs** are the world-independent vocabulary, each with a summary, usage and aliases (`get` → `take`);
+- **options** are the world-specific moves legal right now (`take old shovel`).
+
+Typed text is matched against legal options first. If nothing legal matches but you named something you can perceive (`go east` through a closed door), the intent is still submitted and the wheel explains why it fails. `/help` is built from legal options only, so it never reveals a secret before the world does. The goblin is driven by `reflexPolicy` over `FakeReflex`, with `brute` as fallback, and answers speech through `FakeReason`.
 
 ## Writing worlds
 

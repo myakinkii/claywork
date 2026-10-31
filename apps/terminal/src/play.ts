@@ -6,7 +6,7 @@ import { loadScenario, type Scenario } from "@claywork/clay";
 import { fire } from "@claywork/kiln";
 import { Wheel } from "@claywork/wheel";
 import { perspective } from "@claywork/slip";
-import { glaze, toText } from "@claywork/glaze";
+import { clarify, glaze, help, toText, understand, type MetaDoc } from "@claywork/glaze";
 import { FakeReflex, type FakeRule } from "@claywork/reflex";
 import { FakeReason } from "@claywork/reason";
 import { animate, brute, reflexPolicy, voice } from "@claywork/golems";
@@ -74,15 +74,36 @@ wheel.onTurn((events) => {
   if (events.some((e) => e.actor === me && ["entered", "taken", "dropped", "opened", "unlocked"].includes(e.name)) || events.some((e) => e.name === "narration")) show();
 });
 
+const meta: MetaDoc[] = [
+  { usage: "/help, /?", summary: "This overview." },
+  { usage: "/look", summary: "Describe where you are again (or just press Enter)." },
+  { usage: "/quit", summary: "Leave the world." },
+];
+
 rl.on("line", (line) => {
-  const input = line.trim();
-  if (!input) return show();
-  if (input === "q" || input === "quit") return shutdown();
-  if (input.startsWith("say ")) return wheel.submit({ actor: me, verb: "say", text: input.slice(4) });
-  const option = wheel.options(me).find((o) => o.id === choices[Number(input) - 1] || o.label === input);
-  if (!option) return print("  (no such option: type a number, 'say <words>', or 'q')");
-  wheel.submit(option.intent);
-  print(`  … ${option.label}`);
+  const cmd = understand(line, {
+    actor: me,
+    observation: wheel.observe(me),
+    options: wheel.options(me),
+    verbs: wheel.verbs(),
+    choices,
+  });
+  switch (cmd.kind) {
+    case "empty":
+      return show();
+    case "meta":
+      if (cmd.name === "help" || cmd.name === "?") return print("\n" + help(wheel.verbs(), wheel.options(me), meta));
+      if (cmd.name === "look") return show();
+      if (cmd.name === "quit" || cmd.name === "q") return shutdown();
+      return print(`  (unknown command /${cmd.name}, try /help)`);
+    case "ambiguous":
+      return print(`  ${clarify(cmd)}`);
+    case "unknown":
+      return print(`  ${cmd.message}`);
+    case "act":
+      wheel.submit(cmd.intent);
+      if (cmd.intent.verb !== "say") print(`  … ${cmd.label}`);
+  }
 });
 
 function shutdown() {
@@ -91,7 +112,7 @@ function shutdown() {
   process.exit(0);
 }
 
-console.log(`${scenario.title} — the wheel turns every ${tickMs}ms. Type a number to act, "say <words>" to speak, Enter to look, q to quit.`);
+console.log(`${scenario.title} — the wheel turns every ${tickMs}ms. Type a number or a command ("take shovel", "'hello"), /help for an overview, /quit to leave.`);
 if (scenario.intro) console.log(`\n${scenario.intro}`);
 show();
 wheel.start(tickMs);

@@ -105,6 +105,17 @@ export class Wheel {
     );
   }
 
+  /** The world-independent vocabulary: every verb this wheel understands. */
+  verbs(): Pick<Verb, "name" | "summary" | "usage" | "aliases" | "freeText">[] {
+    return [...this.#verbs.values()].map(({ name, summary, usage, aliases, freeText }) => ({
+      name,
+      summary,
+      usage,
+      ...(aliases ? { aliases } : {}),
+      ...(freeText ? { freeText } : {}),
+    }));
+  }
+
   /** What an actor perceives, ready to render (glaze) or to send to a model (golems). */
   observe(actor: Id): Observation {
     const { world } = this;

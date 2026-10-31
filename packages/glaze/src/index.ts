@@ -111,3 +111,5 @@ export function toHtml(view: View): string {
     `</article>`,
   ].join("");
 }
+
+export { understand, help, clarify, type Command, type CommandContext, type VerbDoc, type MetaDoc } from "./command.ts";
