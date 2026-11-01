@@ -1,0 +1,14 @@
+{
+  "name": "@claywork/server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "The world server: serves the browser client and speaks the workshop protocol over websockets.",
+  "dependencies": {
+    "@claywork/workshop": "*",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/ws": "8.18.2"
+  }
+}

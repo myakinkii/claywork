@@ -1,15 +1,15 @@
 // Play a world in real time. The wheel keeps turning whether you act or not.
 // Usage: npm run play [-- worlds/some-world.json] ; env NAME=Anna TICK_MS=2500
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { createInterface } from "node:readline";
 import { loadScenario, type Scenario } from "@claywork/clay";
 import { fire } from "@claywork/kiln";
 import { Wheel } from "@claywork/wheel";
 import { perspective } from "@claywork/slip";
 import { clarify, glaze, help, toText, understand, type MetaDoc } from "@claywork/glaze";
-import { FakeReflex, type FakeRule } from "@claywork/reflex";
-import { FakeReason } from "@claywork/reason";
-import { MUTTER, animate, brute, reflexPolicy, voice } from "@claywork/golems";
+import { awaken, type Minds } from "@claywork/golems";
 
 const path = resolve(process.argv[2] ?? "worlds/drowned-cellar.json");
 const tickMs = Number(process.env.TICK_MS ?? 2500);
@@ -25,35 +25,10 @@ const wheel = new Wheel(scenario);
 const me = "player";
 wheel.join({ id: me, name: process.env.NAME ?? "Wanderer" });
 
-// --- golems: a stand-in System One model with simple scripted instincts -------
-const instincts: FakeRule = ({ key, question, state }) => {
-  if (key !== "action" || question.type !== "choice") return undefined;
-  const self = (state as { self: { state: string[] } }).self;
-  const hp = Number(self.state.find((s) => s.startsWith("hp "))?.slice(3).split("/")[0] ?? 99);
-  const prefer = hp <= 3 ? "go:" : "attack:";
-  return Object.fromEntries(Object.keys(question.criteria).map((id) => [id, id.startsWith(prefer) ? 3 : 0]));
-};
-const reflex = new FakeReflex({ latencyMs: [60, 300], rules: [instincts] });
-// A stand-in language model: replies when spoken to, and mutters secrets when it thinks it's alone.
-const replies = ["Mine! Go away!", "Shiny things... you have shiny things?", "Door stays shut. Goblin says so."];
-const mutters = [
-  "Nobody looks in the chest. Chest is heavy. Key is safe, hehe.",
-  "Goblin is not scared. Goblin is NOT scared.",
-  "Warm heart, shiny heart... but master said: touch it, and it eats your voice.",
-  "If they hit hard, goblin runs. Goblin always runs. Then goblin comes back.",
-];
-let replied = 0;
-let muttered = 0;
-const banter = new FakeReason(
-  (req) => (req.messages.at(-1)?.content === MUTTER ? mutters[muttered++ % mutters.length]! : replies[replied++ % replies.length]!),
-  { latencyMs: 400 },
-);
-
-for (const thing of wheel.world.things.values()) {
-  if (thing.traits.actor?.kind !== "mob" && thing.traits.actor?.kind !== "npc") continue;
-  animate(wheel, thing.id, { policy: reflexPolicy(reflex, { fallback: brute() }), fallback: brute(), deadlineMs: Math.min(800, tickMs / 2) });
-  voice(wheel, thing.id, banter, { mutter: { everyTicks: 4 } });
-}
+// --- golems: the world's own minds file, if it has one (<world>.minds.ts) ---------
+const mindsFile = path.replace(/\.json$/, ".minds.ts");
+const minds: Minds = existsSync(mindsFile) ? ((await import(pathToFileURL(mindsFile).href)) as { default: () => Minds }).default() : {};
+awaken(wheel, { ...minds, deadlineMs: Math.min(minds.deadlineMs ?? 800, tickMs / 2) });
 
 // --- the terminal ---------------------------------------------------------------
 const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: "> " });

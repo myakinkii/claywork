@@ -40,6 +40,7 @@ export class Wheel {
   readonly #queue = new Map<Id, Intent>();
   readonly #fired = new Set<string>();
   readonly #turnListeners = new Set<(events: GameEvent[]) => void>();
+  readonly #submitListeners = new Set<(intent: Intent) => void>();
   readonly #won = new Set<Id>();
   #timer: ReturnType<typeof setInterval> | undefined;
 
@@ -81,10 +82,38 @@ export class Wheel {
     return thing;
   }
 
+  /**
+   * A player leaves the world: what they carry falls where they stood, they fade,
+   * and their body is moved to nowhere. Their id is never reused.
+   */
+  leave(actor: Id): void {
+    if (!this.world.has(actor)) return;
+    const room = this.world.roomOf(actor);
+    const who = this.world.get(actor);
+    for (const item of this.world.children(actor)) this.world.move(item.id, room);
+    this.#queue.delete(actor);
+    if (room) {
+      this.#publish([{ name: "left", scope: { kind: "room", room }, actor, text: `${who.name} fades away.`, you: "You leave the world." }]);
+    }
+    this.world.move(actor, null);
+  }
+
+  /** Publish something that happened outside the verbs, like a player going link-dead. */
+  announce(draft: EventDraft): GameEvent {
+    return this.#publish([draft])[0]!;
+  }
+
   /** Queue an intent for the next turn. A newer intent from the same actor replaces the old one. */
   submit(intent: Intent): void {
     this.#queue.delete(intent.actor);
     this.#queue.set(intent.actor, intent);
+    for (const fn of this.#submitListeners) fn(intent);
+  }
+
+  /** Called with every intent as it is submitted, before it is resolved. */
+  onSubmit(fn: (intent: Intent) => void): () => void {
+    this.#submitListeners.add(fn);
+    return () => this.#submitListeners.delete(fn);
   }
 
   /** Called after every turn with the events it produced. */

@@ -328,6 +328,7 @@ const attack: Verb = {
         target: t.id,
         text: `${cap(the(who))} hits ${the(t)}${using}.`,
         you: `You hit ${the(t)}${using} for ${weapon.damage}.`,
+        them: `${cap(the(who))} hits you${using} for ${weapon.damage}.`,
         data: { damage: weapon.damage, hp },
       },
     ];

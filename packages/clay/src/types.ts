@@ -23,6 +23,8 @@ export interface Traits {
   echo?: { from: Id; /** What unclear speech sounds like here. */ muffled?: string };
   /** This actor cannot see. */
   blind?: {};
+  /** The player behind this actor has lost their connection; the body stays in the world. */
+  linkdead?: {};
   /** A passage, located in a room, leading to another room. */
   exit?: { to: Id; direction?: string; hidden?: boolean };
   /** Can be picked up. */
@@ -181,6 +183,8 @@ export interface GameEvent {
   text: string;
   /** Second person text, for the actor ("You take the key."). */
   you?: string;
+  /** Second person text, for the target when it perceives ("The goblin hits you."). */
+  them?: string;
   data?: Record<string, Scalar>;
 }
 

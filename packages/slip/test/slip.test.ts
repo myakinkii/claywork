@@ -30,3 +30,10 @@ test("perspective uses second person for the actor", () => {
   assert.equal(perspective(e, "anna"), "You wave.");
   assert.equal(perspective(e, "bob"), "Anna waves.");
 });
+
+test("perspective uses second person for the target too", () => {
+  const e = ev({ kind: "global" }, { actor: "goblin", target: "anna", text: "The goblin hits Anna.", you: "You hit Anna.", them: "The goblin hits you." });
+  assert.equal(perspective(e, "goblin"), "You hit Anna.");
+  assert.equal(perspective(e, "anna"), "The goblin hits you.");
+  assert.equal(perspective(e, "bob"), "The goblin hits Anna.");
+});

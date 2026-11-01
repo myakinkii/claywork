@@ -88,7 +88,9 @@ export class Slip {
   }
 }
 
-/** Render an event from a viewer's perspective. */
+/** Render an event from a viewer's perspective: as the actor, as the target, or as a witness. */
 export function perspective(event: GameEvent, viewer: Id): string {
-  return event.actor === viewer && event.you ? event.you : event.text;
+  if (event.actor === viewer && event.you) return event.you;
+  if (event.target === viewer && event.them) return event.them;
+  return event.text;
 }

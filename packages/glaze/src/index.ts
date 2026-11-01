@@ -24,6 +24,8 @@ export interface Item {
 
 export interface View {
   title: string;
+  /** The viewer cannot see: things listed are only those found by touch. */
+  dark: boolean;
   description?: string;
   things: Item[];
   exits: Item[];
@@ -53,6 +55,7 @@ export function glaze(obs: Observation, options: Option[]): View {
   });
   return {
     title: obs.room.title,
+    dark: obs.dark,
     ...(obs.room.description ? { description: obs.room.description } : {}),
     things: obs.visible.map(item),
     exits: obs.exits.map((e) => ({ ...item(e), name: e.direction ?? e.name })),

@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>claywork</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --ground: #eef1ee;
+    --surface: #f8faf8;
+    --ink: #1f2726;
+    --muted: #5e6b68;
+    --rule: #cfd8d3;
+    --cobalt: #2b4c9b;
+    --cobalt-wash: #e3e9f6;
+    --celadon: #6f9c86;
+    --celadon-wash: #dce8e1;
+    --iron: #a23e2a;
+    --serif: "Spectral", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --ground: #15191a;
+      --surface: #1c2122;
+      --ink: #dce3df;
+      --muted: #8d9a96;
+      --rule: #2e3735;
+      --cobalt: #93aef2;
+      --cobalt-wash: #222b40;
+      --celadon: #6e9c86;
+      --celadon-wash: #1f2a25;
+      --iron: #e08a72;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font: 18px/1.6 var(--serif);
+    padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+  }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; border-radius: 2px; }
+  [hidden] { display: none !important; }
+
+  /* --- lobby --------------------------------------------------------------- */
+  .lobby { max-width: 40rem; margin: 0 auto; padding: 3.5rem 1.5rem 4rem; }
+  .lobby h1 { font-weight: 400; font-style: italic; font-size: 3.2rem; line-height: 1.05; margin: 0 0 .4rem; letter-spacing: -.01em; }
+  .lobby .lede { color: var(--muted); margin: 0 0 2.5rem; max-width: 32rem; }
+  .lobby label { display: block; font-weight: 600; margin-bottom: .35rem; }
+  .lobby input {
+    font: inherit; width: 100%; max-width: 20rem; padding: .45rem .7rem;
+    background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 3px;
+  }
+  .lobby h2 { font-size: 1.15rem; font-weight: 600; margin: 2.5rem 0 .75rem; }
+  .shelf { list-style: none; padding: 0; margin: 0; }
+  .shelf li { padding: 1rem 0; border-top: 1px solid var(--rule); display: grid; grid-template-columns: 1fr auto; gap: .25rem 1.5rem; align-items: start; }
+  .shelf li:last-child { border-bottom: 1px solid var(--rule); }
+  .shelf .title { font-size: 1.25rem; }
+  .shelf .about { grid-column: 1; color: var(--muted); font-size: .95rem; }
+  .shelf .empty { color: var(--muted); font-style: italic; display: block; }
+  .primary {
+    grid-column: 2; grid-row: 1 / span 2; align-self: center;
+    background: var(--cobalt); color: var(--surface); border: 0; border-radius: 3px; padding: .4rem 1rem; cursor: pointer;
+  }
+  .primary:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* --- world ------------------------------------------------------------- */
+  .world { height: 100%; display: grid; grid-template-rows: auto 1fr; }
+  .bar { display: flex; align-items: baseline; gap: 1rem; padding: .6rem 1.25rem; border-bottom: 1px solid var(--rule); }
+  .bar .name { font-style: italic; }
+  .bar .party { color: var(--muted); font-size: .9rem; flex: 1; }
+  .quiet { background: none; border: 1px solid var(--rule); border-radius: 3px; padding: .15rem .7rem; cursor: pointer; color: var(--muted); }
+  .quiet:hover { color: var(--ink); border-color: var(--muted); }
+  .stage { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem); }
+  @media (max-width: 52rem) {
+    /* Phone: where you are on top, the story below, the command line at the bottom near your thumb. */
+    .stage { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+    .here { order: -1; border-left: 0 !important; border-bottom: 1px solid var(--rule); max-height: 42vh; padding-top: 1rem; }
+    .here h2 { font-size: 1.5rem; }
+    .log { padding: 1rem 1.25rem .75rem; }
+    .prompt { padding: .6rem 1.25rem calc(.75rem + env(safe-area-inset-bottom, 0px)); }
+  }
+
+  .story { min-height: 0; display: grid; grid-template-rows: 1fr auto; }
+  .log { overflow-y: auto; padding: 1.25rem 1.5rem 1rem; }
+  .log > * { max-width: 38rem; margin: 0 0 .55rem; }
+  .log .mine { color: var(--ink); }
+  .log .other { color: var(--ink); }
+  .log .world-says { font-style: italic; }
+  .log .heard { font-style: italic; color: var(--muted); }
+  .log .typed { color: var(--muted); font-size: .9rem; margin-bottom: .25rem; }
+  .log .note { color: var(--muted); font-size: .95rem; }
+  .log .err { color: var(--iron); font-size: .95rem; }
+  .log pre { font: .8rem/1.5 var(--mono); color: var(--muted); white-space: pre-wrap; background: var(--surface); border: 1px solid var(--rule); border-radius: 3px; padding: .75rem 1rem; max-width: none; }
+  .log .died { font-size: 1.3rem; font-style: italic; color: var(--iron); margin: 1rem 0; }
+  .prompt { display: flex; gap: .5rem; padding: .75rem 1.5rem 1rem; border-top: 1px solid var(--rule); background: var(--surface); }
+  .prompt input { flex: 1; font: inherit; background: transparent; color: var(--ink); border: 0; border-bottom: 1px solid var(--rule); padding: .3rem 0; }
+  .prompt input:focus { outline: none; border-bottom-color: var(--cobalt); }
+
+  /* --- here: the room, its things and what you can do with them ------------- */
+  .here { overflow-y: auto; padding: 1.25rem 1.5rem 2rem; border-left: 1px solid var(--rule); background: var(--surface); }
+  .here h2 { font-weight: 400; font-size: 1.9rem; line-height: 1.15; margin: 0 0 .6rem; }
+  .here .desc { margin: 0 0 1.25rem; }
+  .here.dark .desc { color: var(--muted); font-style: italic; }
+  .here h3 { font-size: .95rem; font-weight: 600; color: var(--muted); margin: 1.25rem 0 .35rem; }
+  .things { list-style: none; padding: 0; margin: 0; }
+  .things li { padding: .15rem 0; }
+  .thing {
+    background: none; border: 0; padding: 0; cursor: pointer; color: var(--cobalt);
+    text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .2em;
+  }
+  .thing[aria-expanded="true"] { text-decoration-thickness: 2px; }
+  .tags { color: var(--muted); font-size: .9rem; }
+  .acts { display: flex; flex-wrap: wrap; gap: .35rem; margin: .35rem 0 .5rem 1rem; }
+  .act {
+    background: var(--cobalt-wash); color: var(--cobalt); border: 0; border-radius: 999px;
+    padding: .05rem .75rem; cursor: pointer; font-size: .92rem;
+  }
+  .act:hover { background: var(--cobalt); color: var(--surface); }
+  .general { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: 1.5rem; }
+  .status { margin-top: 1.25rem; color: var(--muted); font-size: .9rem; }
+  .status .hp { color: var(--ink); }
+  .conn { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: .35rem 1rem; border-radius: 3px; font-size: .9rem; }
+  @media (prefers-reduced-motion: no-preference) {
+    .acts { animation: open .14s ease-out; }
+    @keyframes open { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+  }
+</style>
+</head>
+<body>
+
+<main class="lobby" id="lobby" hidden>
+  <h1>claywork</h1>
+  <p class="lede">Text worlds that keep living while you read. Pick a name, then start a world or join someone already inside one.</p>
+  <label for="name">Your name</label>
+  <input id="name" maxlength="24" autocomplete="nickname" placeholder="Anna">
+  <h2>Worlds</h2>
+  <ul class="shelf" id="worlds"></ul>
+  <h2>Running now</h2>
+  <ul class="shelf" id="instances"></ul>
+</main>
+
+<div class="world" id="world" hidden>
+  <header class="bar">
+    <span class="name" id="world-title"></span>
+    <span class="party" id="party"></span>
+    <button class="quiet" id="leave">Leave world</button>
+  </header>
+  <div class="stage">
+    <section class="story" aria-label="Story">
+      <div class="log" id="log" aria-live="polite"></div>
+      <form class="prompt" id="prompt">
+        <input id="command" autocomplete="off" spellcheck="false" placeholder="What do you do? (/help for an overview)" aria-label="Command">
+      </form>
+    </section>
+    <aside class="here" id="here" aria-label="Where you are"></aside>
+  </div>
+</div>
+
+<div class="conn" id="conn" hidden>Reconnecting…</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => {
+  const node = Object.assign(document.createElement(tag), props);
+  for (const k of kids) if (k !== null && k !== undefined) node.append(k);
+  return node;
+};
+
+const state = { token: null, socket: null, lobby: null, view: null, dead: false, open: new Set(), history: [], at: -1, retry: 0 };
+try { state.token = localStorage.getItem("claywork-token"); } catch {}
+try { $("name").value = localStorage.getItem("claywork-name") || ""; } catch {}
+
+// --- connection ---------------------------------------------------------------
+function connect() {
+  const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+  const socket = new WebSocket(url);
+  state.socket = socket;
+  socket.onopen = () => {
+    state.retry = 0;
+    $("conn").hidden = true;
+    send({ type: "hello", ...(state.token ? { token: state.token } : {}) });
+  };
+  socket.onmessage = (e) => receive(JSON.parse(e.data));
+  socket.onclose = () => {
+    $("conn").hidden = false;
+    setTimeout(connect, Math.min(8000, 500 * 2 ** state.retry++));
+  };
+}
+const send = (m) => state.socket?.readyState === WebSocket.OPEN && state.socket.send(JSON.stringify(m));
+
+function receive(m) {
+  switch (m.type) {
+    case "welcome":
+      state.token = m.token;
+      try { localStorage.setItem("claywork-token", m.token); } catch {}
+      return;
+    case "lobby":
+      state.lobby = m;
+      return showLobby();
+    case "joined":
+      return showWorld(m);
+    case "party":
+      $("party").textContent = m.members.length > 1 ? `With ${party(m.members.filter((x) => !x.you))}` : "Alone";
+      return;
+    case "view":
+      state.view = m.view;
+      if (m.dead && !state.dead) log(el("p", { className: "died", textContent: "You died. The clay takes you back." }));
+      state.dead = m.dead;
+      return renderHere();
+    case "event":
+      return logEvent(m);
+    case "notice":
+      if (m.kind === "help") return log(el("pre", { textContent: m.text }));
+      return log(el("p", { className: m.kind === "error" ? "err" : "note", textContent: m.text }));
+    case "left":
+      state.view = null;
+      state.dead = false;
+      $("log").replaceChildren();
+      return;
+  }
+}
+
+// --- lobby ----------------------------------------------------------------------
+function playerName() {
+  const name = $("name").value.trim();
+  try { localStorage.setItem("claywork-name", name); } catch {}
+  return name;
+}
+
+function showLobby() {
+  $("world").hidden = true;
+  $("lobby").hidden = false;
+  const { worlds, instances } = state.lobby;
+  $("worlds").replaceChildren(...worlds.map((w) => el("li", {},
+    el("span", { className: "title", textContent: w.title }),
+    el("button", { className: "primary", textContent: "Start", onclick: () => enter({ type: "start", world: w.id }) }),
+    w.intro ? el("span", { className: "about", textContent: w.intro }) : null,
+  )));
+  $("instances").replaceChildren(...(instances.length ? instances.map((i) => el("li", {},
+    el("span", { className: "title", textContent: i.title }),
+    el("button", { className: "primary", textContent: "Join", onclick: () => enter({ type: "join", instance: i.id }) }),
+    el("span", { className: "about", textContent: party(i.members) }),
+  )) : [el("li", {}, el("span", { className: "empty", textContent: "Nobody is inside a world right now. Start one, and it will appear here for others to join." }))]));
+}
+
+function enter(message) {
+  const name = playerName();
+  if (!name) {
+    $("name").focus();
+    $("name").placeholder = "Choose a name first";
+    return;
+  }
+  send({ ...message, name });
+}
+
+function party(members) {
+  return members.map((m) => m.present ? m.name : `${m.name} (away)`).join(", ");
+}
+
+// --- world ----------------------------------------------------------------------
+function showWorld(m) {
+  $("lobby").hidden = true;
+  $("world").hidden = false;
+  $("world-title").textContent = m.instance.title;
+  $("command").focus();
+}
+
+function log(node) {
+  const box = $("log");
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.append(node);
+  while (box.childElementCount > 400) box.firstElementChild.remove();
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+
+function logEvent(m) {
+  const kind = m.name === "narration" ? "world-says" : m.name === "overheard" ? "heard" : m.mine ? "mine" : "other";
+  log(el("p", { className: kind, textContent: m.text }));
+}
+
+function renderHere() {
+  const v = state.view;
+  const here = $("here");
+  if (!v) return here.replaceChildren();
+  here.classList.toggle("dark", v.dark);
+
+  const item = (i) => {
+    const expanded = state.open.has(i.id);
+    const tags = [...i.state, ...(i.where ? [i.where] : [])];
+    const li = el("li", {},
+      el("button", {
+        className: "thing", textContent: i.name, ariaExpanded: String(expanded),
+        onclick: () => { expanded ? state.open.delete(i.id) : state.open.add(i.id); renderHere(); },
+      }),
+      tags.length ? el("span", { className: "tags", textContent: ` (${tags.join(", ")})` }) : null,
+    );
+    if (expanded && i.links.length) li.append(el("div", { className: "acts" }, ...i.links.map(act)));
+    return li;
+  };
+  const section = (title, items) => items.length ? [el("h3", { textContent: title }), el("ul", { className: "things" }, ...items.map(item))] : [];
+  const hp = v.status.find((s) => s.startsWith("hp "));
+
+  here.replaceChildren(
+    el("h2", { textContent: v.title }),
+    v.description ? el("p", { className: "desc", textContent: v.description }) : null,
+    ...section("You notice", v.things),
+    ...section("Ways out", v.exits),
+    ...section("You carry", v.carrying),
+    state.dead ? null : el("div", { className: "general" }, ...v.general.map(act)),
+    el("p", { className: "status" }, hp ? el("span", { className: "hp", textContent: hp.replace("hp ", "Health ") }) : null,
+      ...v.status.filter((s) => s !== hp).map((s) => ` · ${s}`)),
+  );
+}
+
+function act(link) {
+  return el("button", {
+    className: "act", textContent: link.label, disabled: state.dead,
+    onclick: () => { log(el("p", { className: "typed", textContent: `› ${link.label}` })); send({ type: "option", id: link.option }); },
+  });
+}
+
+$("prompt").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const input = $("command");
+  const text = input.value;
+  if (text.trim()) {
+    log(el("p", { className: "typed", textContent: `› ${text}` }));
+    state.history.push(text);
+  }
+  state.at = -1;
+  input.value = "";
+  send({ type: "command", text });
+});
+
+$("command").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+  const h = state.history;
+  if (!h.length) return;
+  e.preventDefault();
+  state.at = e.key === "ArrowUp" ? (state.at < 0 ? h.length - 1 : Math.max(0, state.at - 1)) : (state.at < 0 ? -1 : state.at + 1);
+  if (state.at >= h.length) state.at = -1;
+  e.target.value = state.at < 0 ? "" : h[state.at];
+});
+
+$("leave").addEventListener("click", () => send({ type: "leave" }));
+$("name").addEventListener("keydown", (e) => { if (e.key === "Enter") e.preventDefault(); });
+
+connect();
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "@claywork/workshop",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Where worlds are kept and set turning: fired worlds, running instances, player sessions. No networking.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@claywork/clay": "*", "@claywork/wheel": "*", "@claywork/kiln": "*", "@claywork/glaze": "*", "@claywork/golems": "*" }
+}

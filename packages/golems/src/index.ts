@@ -245,3 +245,34 @@ export function voice(wheel: Wheel, actor: Id, reason: Reason, options: VoiceOpt
     },
   };
 }
+
+// --- awakening: every inhabitant of a world at once ---------------------------------
+
+/** The minds a world's inhabitants think with. Any of them may be missing. */
+export interface Minds {
+  reflex?: Reflex;
+  reason?: Reason;
+  /** Voices mutter every N ticks. Omit for golems that only answer. */
+  mutterEvery?: number;
+  /** Decision budget per tick, in ms. Default 800. */
+  deadlineMs?: number;
+}
+
+/**
+ * Bring every mob and npc in a world to life: a reflex policy (or the brute when there is
+ * no reflex model) with the brute as fallback, and a voice when there is a reason model.
+ * Returns handles so the caller can stop them all.
+ */
+export function awaken(wheel: Wheel, minds: Minds = {}, options: Pick<AnimateOptions, "onDecision"> = {}): Animated[] {
+  const handles: Animated[] = [];
+  for (const thing of wheel.world.things.values()) {
+    const kind = thing.traits.actor?.kind;
+    if (kind !== "mob" && kind !== "npc") continue;
+    const policy = minds.reflex ? reflexPolicy(minds.reflex, { fallback: brute() }) : brute();
+    handles.push(animate(wheel, thing.id, { policy, fallback: brute(), deadlineMs: minds.deadlineMs ?? 800, ...(options.onDecision ? { onDecision: options.onDecision } : {}) }));
+    if (minds.reason) {
+      handles.push(voice(wheel, thing.id, minds.reason, minds.mutterEvery ? { mutter: { everyTicks: minds.mutterEvery } } : {}));
+    }
+  }
+  return handles;
+}

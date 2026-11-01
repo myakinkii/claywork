@@ -18,7 +18,8 @@ models for conversation. Like a golem, the clay comes alive through words.
 | **glaze** | The hypertext surface. The options a model chooses from are the links a human clicks. |
 | **reflex** | Model-agnostic System One interface (Choice / Score / Noul, probabilities, confidence) + `FakeReflex`. |
 | **reason** | Model-agnostic System Two interface (language models) + `FakeReason`. |
-| **golems** | NPC minds. Policies, codelab-style thresholds, deadlines with fallbacks, and voices. |
+| **golems** | NPC minds. Policies, codelab-style thresholds, deadlines with fallbacks, voices, and `awaken()` for a whole world. |
+| **workshop** | Where worlds are kept and set turning: fired worlds on the shelf, running instances, player sessions. No networking. |
 
 Ideas, not code yet: **potter** (the LLM that generates scenarios, repaired by kiln cracks) and **sherds** (saves and replays from the event log).
 
@@ -46,6 +47,7 @@ npm test              # node:test, all offline with fakes
 npm run typecheck
 npm run kiln          # fire worlds/drowned-cellar.json
 npm run play          # play it in the terminal, in real time
+npm start             # the world server and browser client at http://localhost:8080
 NAME=Anna TICK_MS=1500 npm run play
 ```
 
@@ -58,6 +60,26 @@ Input has three layers, kept apart on purpose:
 - **options** are the world-specific moves legal right now (`take old shovel`).
 
 Typed text is matched against legal options first. If nothing legal matches but you named something you can perceive (`go east` through a closed door), the intent is still submitted and the wheel explains why it fails. `/help` is built from legal options only, so it never reveals a secret before the world does. The goblin is driven by `reflexPolicy` over `FakeReflex`, with `brute` as fallback, and answers speech through `FakeReason`.
+
+## The world server
+
+`npm start` serves the browser client and speaks a small JSON protocol over `/ws` (see `packages/workshop/src/protocol.ts`). Settings come from the environment:
+
+| Variable | Default | |
+| --- | --- | --- |
+| `PORT` | `8080` | If it's taken, the server says so and exits. |
+| `HOST` | `127.0.0.1` | Only this machine. `0.0.0.0` lets others on your network play. |
+| `TICK_MS` | `2000` | Milliseconds per tick. |
+| `DEBUG` | off | `all`, or any of `net,events,intents,golems`. Logs to stderr. |
+
+`DEBUG=all npm start` shows the world unfiltered by perception: every event with its scope, every intent as it's submitted (players and golems alike), every golem decision with its source, confidence and timing, and every session coming and going. Tokens are only ever logged by their first characters. `GET /health` answers with a small JSON status, handy to check that the thing answering on a port really is claywork.
+
+- **Lobby.** Only worlds that fire clean are on the shelf. Start one, or join a running instance; whoever is inside is the party.
+- **Instances** wrap a wheel with its awakened inhabitants and stop when the last member leaves.
+- **Sessions** outlive connections. When a socket drops, the body stays in the world, link-dead ("goes still, staring at nothing"), and the world keeps turning around it. Reconnecting with the session token picks it up again.
+- **The client** is one HTML file: where you are on one side (things as links whose actions open in place), the story and a command line on the other. Death is final for now.
+
+A world can ship its inhabitants' minds next to its data: `worlds/<id>.minds.ts` default-exports a function making fresh `Minds` (reflex, reason, mutter rate) per instance. The terminal and the server both use it.
 
 ## Writing worlds
 
@@ -111,6 +133,7 @@ Golem voices can also **mutter** (`voice(..., { mutter: { everyTicks: 4 } })`): 
 - Real adapters behind `Reflex` (a Jev / djev-run HTTP client) and `Reason` (any LLM API), keeping the fakes for tests.
 - ADK (TypeScript) agents as `Policy` / voice implementations for slow NPCs.
 - The deliberation gate: a Noul answer that wakes System Two to update a golem's goal.
-- A world server (websocket) with glaze rendered in the browser.
+- Party semantics: respawn, shared versus personal state (`once` per world or per actor), party goals.
+- Links inside the prose: references in descriptions that become links only when perceivable.
 - Hearing in the dark (sounds of events you can't see), smell, and verbs that change light (`light`, `extinguish`).
 - JSON Schema for scenarios, then the potter.

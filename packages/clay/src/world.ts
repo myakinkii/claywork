@@ -195,6 +195,7 @@ export class World {
       const { hp, maxHp } = t.traits.vitals;
       state.push(hp > 0 ? `hp ${hp}/${maxHp}` : "dead");
     }
+    if (t.traits.linkdead) state.push("motionless");
     const seen: Seen = { id: t.id, name: t.name, state };
     if (t.description) seen.description = t.description;
     if (t.location && !this.get(t.location).traits.room) seen.inside = t.location;
