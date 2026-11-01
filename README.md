@@ -1,6 +1,6 @@
 # claywork
 
-Because clay is mud.
+Because clay is mud. 100% vibe-coded
 
 A hypertext MUD engine where the world is data, the rules are code, and the
 inhabitants are animated by models: fast System One models for reflexes, language
