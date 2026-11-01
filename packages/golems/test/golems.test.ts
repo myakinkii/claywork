@@ -5,7 +5,7 @@ import { loadScenario } from "@claywork/clay";
 import { Wheel } from "@claywork/wheel";
 import { FakeReflex } from "@claywork/reflex";
 import { FakeReason } from "@claywork/reason";
-import { animate, brute, reflexPolicy, voice, type Policy } from "@claywork/golems";
+import { MUTTER, animate, brute, reflexPolicy, voice, type Policy } from "@claywork/golems";
 
 const cellarWithAnnaDownstairs = () => {
   const wheel = new Wheel(loadScenario(new URL("../../../worlds/drowned-cellar.json", import.meta.url)));
@@ -79,4 +79,16 @@ test("a golem with a voice answers when spoken to, in character", async () => {
   mouth.stop();
   assert.match(reason.requests[0]!.system!, /cowardly but greedy goblin/);
   assert.ok(wheel.slip.log.some((e) => e.actor === "goblin" && e.name === "said" && /Shiny/.test(e.text)));
+});
+
+test("a voice can mutter on its own, for whoever is listening", async () => {
+  const wheel = cellarWithAnnaDownstairs();
+  const reason = new FakeReason((req) => (req.messages.at(-1)!.content === MUTTER ? "Nobody looks in the chest." : "Go away!"));
+  const mouth = voice(wheel, "goblin", reason, { mutter: { everyTicks: 2 } });
+  await turns(wheel, 4);
+  mouth.stop();
+  const said = wheel.slip.log.filter((e) => e.actor === "goblin" && e.name === "said");
+  assert.ok(said.length >= 1);
+  assert.match(said[0]!.text, /Nobody looks in the chest/);
+  assert.ok(reason.requests.every((r) => !r.messages.some((m) => m.content === MUTTER && r.messages.indexOf(m) < r.messages.length - 1)), "mutter prompts are not remembered as conversation");
 });

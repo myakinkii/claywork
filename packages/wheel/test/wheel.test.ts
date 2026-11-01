@@ -10,19 +10,26 @@ function play(wheel: Wheel, actor: string, verb: string, target?: string, extra:
   return wheel.turn();
 }
 
-test("a player joins at spawn and sees the room, its things and exits", () => {
+test("a player joins at spawn, in the dark, and finds things by touch", () => {
   const wheel = new Wheel(cellar());
   wheel.join({ id: "anna", name: "Anna" });
   const obs = wheel.observe("anna");
   assert.equal(obs.room.title, "Stairwell");
-  assert.deepEqual(obs.visible.map((v) => v.id), ["old_shovel"]);
-  assert.deepEqual(obs.exits.map((e) => e.direction), ["down"]);
+  assert.equal(obs.dark, true);
+  assert.match(obs.room.description!, /pitch black/);
+  assert.deepEqual(obs.visible, [], "nothing is seen in the dark");
+  assert.deepEqual(obs.exits.map((e) => e.direction), ["down"], "but you can feel the way you came");
   assert.match(obs.recent[0]!, /potter's house/);
+
+  const [found] = play(wheel, "anna", "search");
+  assert.equal(found!.you, "You feel around in the dark and find: old shovel, crooked brick.");
+  assert.deepEqual(wheel.observe("anna").visible.map((v) => v.id), ["old_shovel", "loose_brick"]);
 });
 
 test("intents only take effect on the next turn, one per actor", () => {
   const wheel = new Wheel(cellar());
   wheel.join({ id: "anna", name: "Anna" });
+  play(wheel, "anna", "search");
   wheel.submit({ actor: "anna", verb: "wait" });
   wheel.submit({ actor: "anna", verb: "take", target: "old_shovel" });
   assert.equal(wheel.world.get("old_shovel").location, "stairwell");
@@ -41,6 +48,7 @@ test("failed intents explain themselves to the actor only", () => {
 test("the goblin's glyph blocks the door until it is dead", () => {
   const wheel = new Wheel(cellar());
   wheel.join({ id: "anna", name: "Anna" });
+  play(wheel, "anna", "search");
   play(wheel, "anna", "take", "old_shovel");
   play(wheel, "anna", "go", "stairs_down");
   play(wheel, "anna", "open", "iron_chest");
@@ -61,7 +69,8 @@ test("the goblin's glyph blocks the door until it is dead", () => {
 test("looking closely reveals the secret passage, once", () => {
   const wheel = new Wheel(cellar());
   wheel.join({ id: "anna", name: "Anna" });
-  play(wheel, "anna", "go", "stairs_down");
+  assert.equal(play(wheel, "anna", "look", "loose_brick")[0]!.name, "failed", "you can't examine what you haven't found");
+  play(wheel, "anna", "search");
   assert.ok(!wheel.options("anna").some((o) => o.id === "go:niche_passage"));
   const events = play(wheel, "anna", "look", "loose_brick");
   assert.ok(events.some((e) => e.name === "narration" && /gap opens/.test(e.text)));
@@ -74,6 +83,7 @@ test("others in the room perceive what happens; others elsewhere do not", () => 
   wheel.join({ id: "anna", name: "Anna" });
   wheel.join({ id: "bob", name: "Bob" });
   play(wheel, "bob", "go", "stairs_down");
+  play(wheel, "anna", "search");
   play(wheel, "anna", "take", "old_shovel");
   assert.ok(!wheel.observe("bob").recent.some((r) => r.includes("shovel")));
   assert.match(wheel.observe("anna").recent.at(-1)!, /You take the old shovel/);
@@ -82,6 +92,8 @@ test("others in the room perceive what happens; others elsewhere do not", () => 
 test("options are a closed set built from verbs and traits", () => {
   const wheel = new Wheel(cellar());
   wheel.join({ id: "anna", name: "Anna" });
+  assert.ok(!wheel.options("anna").some((o) => o.id === "take:old_shovel"), "not before it is found");
+  play(wheel, "anna", "search");
   const ids = wheel.options("anna").map((o) => o.id);
   assert.ok(ids.includes("take:old_shovel"));
   assert.ok(ids.includes("go:stairs_down"));

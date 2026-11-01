@@ -48,10 +48,10 @@ function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** Everything an actor can touch: reachable things, inventory and visible exits. */
+/** Everything an actor can touch: things it perceives in reach, inventory and visible exits. */
 export function touchable(world: World, actor: Id): Thing[] {
   const room = world.roomOf(actor);
-  return [...world.reachable(actor), ...world.carried(actor), ...(room ? world.exitsFrom(room) : [])];
+  return [...world.perceivable(actor), ...world.carried(actor), ...(room ? world.exitsFrom(room) : [])];
 }
 
 function canTouch(world: World, actor: Id, target: Id): boolean {
@@ -91,7 +91,7 @@ const look: Verb = {
   name: "look",
   summary: "Look around, or examine something closely. Details sometimes reveal secrets.",
   usage: "look [thing]",
-  aliases: ["l", "examine", "x"],
+  aliases: ["l", "examine", "x", "read"],
   options(world, actor) {
     const around = option(actor, "look", undefined, "look around", "Look around the room. Safe, but the moment passes.");
     return [
@@ -108,7 +108,10 @@ const look: Verb = {
   },
   perform({ world, actor, intent }) {
     const target = intent.target ? world.get(intent.target) : world.get(world.roomOf(actor)!);
-    const text = target.description ?? `You see nothing special about ${the(target)}.`;
+    const dark = !intent.target && !world.canSee(actor);
+    const text = dark
+      ? (target.traits.dark?.text ?? "It is too dark to see. You could feel around for things.")
+      : (target.description ?? `You see nothing special about ${the(target)}.`);
     return {
       events: [{ name: "looked", scope: { kind: "actor", actor }, actor, target: target.id, text, you: text }],
     };
@@ -169,13 +172,13 @@ const take: Verb = {
   aliases: ["get", "grab"],
   options(world, actor) {
     return world
-      .reachable(actor)
+      .perceivable(actor)
       .filter((t) => t.traits.takeable)
       .map((t) => option(actor, "take", t, `take ${t.name}`, `Pick up ${the(t)} and carry it.`));
   },
   check({ world, actor, intent }) {
     const t = intent.target;
-    if (!t || !world.reachable(actor).some((x) => x.id === t)) return "You don't see that here.";
+    if (!t || !world.perceivable(actor).some((x) => x.id === t)) return "You don't see that here.";
     if (!world.get(t).traits.takeable) return "You can't take that.";
     return null;
   },
@@ -296,7 +299,7 @@ const attack: Verb = {
     const weapon = weaponOf(world, actor);
     const using = weapon.thing ? ` with ${the(weapon.thing)}` : " with bare hands";
     return world
-      .reachable(actor)
+      .perceivable(actor)
       .filter((t) => t.traits.actor && t.traits.vitals && world.isAlive(t.id))
       .map((t) =>
         option(actor, "attack", t, `attack ${t.name}`, `Strike ${the(t)}${using} for ${weapon.damage} damage. They may strike back.`),
@@ -304,7 +307,7 @@ const attack: Verb = {
   },
   check(ctx) {
     const t = targetOf(ctx);
-    if (!t || !ctx.world.reachable(ctx.actor).some((x) => x.id === t.id)) return "There's no one like that here.";
+    if (!t || !ctx.world.perceivable(ctx.actor).some((x) => x.id === t.id)) return "There's no one like that here.";
     if (!t.traits.vitals || !t.traits.actor) return "Attacking that would achieve nothing.";
     if (!ctx.world.isAlive(t.id)) return `${cap(the(t))} is already dead.`;
     return null;
@@ -362,10 +365,51 @@ const wait: Verb = {
   check: () => null,
   // Chosen stillness: the wheel resets the count whenever the actor does anything else.
   perform({ world, actor }) {
-    const still = world.prop(actor, "actor.still");
-    world.setProp(actor, "actor.still", (typeof still === "number" ? still : 0) + 1);
+    holdStill(world, actor);
     return { events: [] };
   },
 };
 
-export const standardVerbs: Verb[] = [look, go, take, drop, toggle("open", true), toggle("close", false), unlock, attack, say, wait];
+function holdStill(world: World, actor: Id): void {
+  const still = world.prop(actor, "actor.still");
+  world.setProp(actor, "actor.still", (typeof still === "number" ? still : 0) + 1);
+}
+
+const search: Verb = {
+  name: "search",
+  summary: "Feel around in the dark, or search carefully for things that are hidden.",
+  usage: "search",
+  aliases: ["feel", "grope"],
+  options: (_world, actor) => [option(actor, "search", undefined, "search", "Search the room by touch and patience. Finds things darkness or concealment hide.")],
+  check: () => null,
+  perform({ world, actor }) {
+    const sees = world.canSee(actor);
+    const found = world.reachable(actor).filter((t) => !world.knows(actor, t.id) && (!sees || t.traits.concealed));
+    for (const t of found) world.learn(actor, t.id);
+    const how = sees ? "You search carefully" : "You feel around in the dark";
+    const you = found.length ? `${how} and find: ${found.map((t) => t.name).join(", ")}.` : `${how}, but find nothing new.`;
+    const who = world.get(actor);
+    return {
+      events: [{ name: "searched", scope: roomScope(world, actor), actor, text: `${cap(the(who))} searches the room.`, you, data: { found: found.length } }],
+    };
+  },
+};
+
+const listen: Verb = {
+  name: "listen",
+  summary: "Hold your breath and listen. Faint sounds come through clearly for as long as you stay still.",
+  usage: "listen",
+  aliases: ["hear"],
+  options: (_world, actor) => [option(actor, "listen", undefined, "listen", "Stay still and listen. Faint and distant sounds become clear.")],
+  check: () => null,
+  perform({ world, actor }) {
+    holdStill(world, actor);
+    const already = world.prop(actor, "actor.listening") === true;
+    world.setProp(actor, "actor.listening", true);
+    const sounds = world.get(world.roomOf(actor)!).traits.room?.sounds;
+    const you = already ? "You keep listening." : `You hold your breath and listen.${sounds ? ` ${sounds}` : ""}`;
+    return { events: [{ name: "listened", scope: { kind: "actor", actor }, actor, text: you, you }] };
+  },
+};
+
+export const standardVerbs: Verb[] = [look, search, listen, go, take, drop, toggle("open", true), toggle("close", false), unlock, attack, say, wait];

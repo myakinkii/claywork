@@ -7,6 +7,8 @@ import { help, understand, clarify, type Command } from "@claywork/glaze";
 const setup = (where: "stairwell" | "cellar" = "cellar") => {
   const wheel = new Wheel(loadScenario(new URL("../../../worlds/drowned-cellar.json", import.meta.url)));
   wheel.join({ id: "anna", name: "Anna" });
+  wheel.submit({ actor: "anna", verb: "search" });
+  wheel.turn();
   if (where === "cellar") {
     wheel.submit({ actor: "anna", verb: "go", target: "stairs_down" });
     wheel.turn();

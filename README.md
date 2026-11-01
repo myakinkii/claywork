@@ -94,11 +94,23 @@ The engine ships a library of standard verbs (look, go, take, drop, open, close,
 
 Glyphs can `grant` and `revoke` traits (curses, blessings, a stolen voice), test them with `{ "trait": [...] }`, and react to **stillness**: `wait` is chosen stillness, counted per actor (`{ "still": ["$actor", 3] }`), broken by any other action. Idleness (sending nothing) neither counts nor breaks it. In the Drowned Cellar, the clay figures only move while you hold still.
 
+## Senses
+
+Perception is not all-or-nothing:
+
+- **Sight.** A room with `dark` hides everything unless a lit `light` is somewhere in it (a carried torch counts). In the dark you still feel the exits, and `search` finds things by touch. Each actor remembers what it found (`World.knows`, part of the snapshot). `concealed` things need a search even in light, and `blind` actors never see.
+- **Hearing.** A room with `echo: { from }` overhears another room: speech arrives muffled, loud things as thuds, quiet things not at all. `listen` makes everything clear, words included (but not who spoke them), for as long as you stay still. Rooms can describe what you hear with `room.sounds`.
+- **Attention is stillness.** `wait` and `listen` both count stillness up and keep you listening; any other action breaks both.
+
+Slip stays plumbing: the wheel injects the `overhear` rule, and an actor may receive a transformed event instead of the original. Overheard events are re-scoped to the listener and never carry an actor, so nobody is told "You say..." about something heard through a wall.
+
+Golem voices can also **mutter** (`voice(..., { mutter: { everyTicks: 4 } })`): they talk to themselves now and then, which is what makes eavesdropping worth it.
+
 ## Next
 
 - Real adapters behind `Reflex` (a Jev / djev-run HTTP client) and `Reason` (any LLM API), keeping the fakes for tests.
 - ADK (TypeScript) agents as `Policy` / voice implementations for slow NPCs.
 - The deliberation gate: a Noul answer that wakes System Two to update a golem's goal.
 - A world server (websocket) with glaze rendered in the browser.
-- Senses: sight, hearing and darkness filtering perception (World.reachable and Slip), plus attention verbs like `listen`.
+- Hearing in the dark (sounds of events you can't see), smell, and verbs that change light (`light`, `extinguish`).
 - JSON Schema for scenarios, then the potter.

@@ -4,6 +4,7 @@ import { fire, check } from "@claywork/glyphs";
 import { Slip, perspective } from "@claywork/slip";
 import { standardVerbs, type Verb } from "./verbs.ts";
 import { redescribe, worldVerb } from "./world-verbs.ts";
+import { STILL_VERBS, overhear } from "./senses.ts";
 
 /** How an intent turned out, for simulations and tests. */
 export type Outcome = "done" | "failed" | "unable" | "blocked";
@@ -45,7 +46,10 @@ export class Wheel {
   constructor(scenario: Scenario, options: WheelOptions = {}) {
     this.scenario = scenario;
     this.world = new World(scenario);
-    this.slip = new Slip((id) => (this.world.has(id) ? this.world.roomOf(id) : null), { memory: options.memory ?? 20 });
+    this.slip = new Slip((id) => (this.world.has(id) ? this.world.roomOf(id) : null), {
+      memory: options.memory ?? 20,
+      overhear: overhear(this.world),
+    });
     for (const verb of options.verbs ?? standardVerbs) this.#verbs.set(verb.name, { origin: "engine", ...verb });
     for (const [name, config] of Object.entries(scenario.verbs ?? {})) {
       const base = this.#verbs.get(name);
@@ -146,11 +150,14 @@ export class Wheel {
     if (!roomId) throw new Error(`${actor} is nowhere`);
     const room = world.get(roomId);
     const self = world.seen(actor);
+    const dark = !world.canSee(actor);
+    const description = dark ? (room.traits.dark?.text ?? "It is too dark to see.") : room.description;
     return {
       tick: this.tick,
+      dark,
       self: { ...self, carrying: world.carried(actor).map((t) => world.seen(t.id)) },
-      room: { id: room.id, title: room.traits.room?.title ?? room.name, ...(room.description ? { description: room.description } : {}) },
-      visible: world.reachable(actor).map((t) => world.seen(t.id)),
+      room: { id: room.id, title: room.traits.room?.title ?? room.name, ...(description ? { description } : {}) },
+      visible: world.perceivable(actor).map((t) => world.seen(t.id)),
       exits: world.exitsFrom(roomId).map((t) => ({ ...world.seen(t.id), ...(t.traits.exit?.direction ? { direction: t.traits.exit.direction } : {}) })),
       recent: this.slip.recent(actor).map((e) => perspective(e, actor)),
     };
@@ -183,8 +190,11 @@ export class Wheel {
     };
 
     if (!world.has(actor) || !world.isAlive(actor)) return [];
-    // Doing anything at all breaks stillness; "wait" counts it back up.
-    if (intent.verb !== "wait" && world.get(actor).traits.actor) world.setProp(actor, "actor.still", 0);
+    // Doing anything else breaks stillness and attention; wait and listen count stillness up.
+    if (!STILL_VERBS.has(intent.verb) && world.get(actor).traits.actor) {
+      world.setProp(actor, "actor.still", 0);
+      world.setProp(actor, "actor.listening", false);
+    }
 
     const verb = this.#verbs.get(intent.verb);
     if (!verb) return outcome("failed", [say("failed", `You don't know how to ${intent.verb}.`)]);

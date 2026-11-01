@@ -45,6 +45,13 @@ export function fire(scenario: Scenario): Firing {
       else if (!isRoom(exit.to)) error("destination-not-room", `Exit "${t.id}" leads to "${exit.to}", which is not a room.`, t.id);
       if (t.location === null || !isRoom(t.location)) error("exit-not-in-room", `Exit "${t.id}" must be located directly in a room.`, t.id);
     }
+    const echo = t.traits.echo;
+    if (echo) {
+      if (!t.traits.room) error("echo-not-room", `"${t.id}" has an echo but is not a room.`, t.id);
+      if (!isRoom(echo.from)) error("echo-from-nowhere", `"${t.id}" hears "${echo.from}", which is not a room.`, t.id);
+      else if (echo.from === t.id) warn("echo-self", `"${t.id}" echoes itself.`, t.id);
+    }
+    if (t.traits.dark && !t.traits.room) warn("dark-not-room", `"${t.id}" is dark but not a room; darkness only applies to rooms.`, t.id);
     const key = t.traits.lockable?.key;
     if (key && !exists(key)) error("missing-key", `"${t.id}" is locked by "${key}", which does not exist.`, t.id);
     if (t.traits.lockable?.locked && !key) warn("no-key", `"${t.id}" is locked and has no key; only a glyph can open it.`, t.id);

@@ -1,15 +1,18 @@
 {
   "id": "drowned-cellar",
   "title": "The Drowned Cellar",
-  "intro": "You descend from the rain into an old potter's house. Somewhere below, they say, a heart of clay still beats.",
+  "intro": "You step in from the rain and the door of the old potter's house swings shut behind you. Darkness. Somewhere below, they say, a heart of clay still beats.",
   "spawn": "stairwell",
   "things": [
     {
       "id": "stairwell",
       "name": "stairwell",
       "location": null,
-      "description": "Wet stone steps spiral down into the dark. Rainwater trickles past your boots.",
-      "traits": { "room": { "title": "Stairwell" } }
+      "description": "Wet stone steps spiral down. Rainwater trickles past your boots. One brick low in the wall sits a little crooked.",
+      "traits": {
+        "room": { "title": "Stairwell", "sounds": "Rain on the roof, far above. Below, water laps against stone." },
+        "dark": { "text": "It is pitch black. Rain trickles somewhere above you, and the stone under your feet is slick. You could feel around for things." }
+      }
     },
     {
       "id": "stairs_down",
@@ -25,12 +28,26 @@
       "description": "A potter's clay shovel, its edge still sharp enough to hurt.",
       "traits": { "takeable": {}, "weapon": { "damage": 4 } }
     },
+    {
+      "id": "loose_brick",
+      "name": "crooked brick",
+      "location": "stairwell",
+      "description": "The brick is loose. You push it, and it slides inward.",
+      "traits": {}
+    },
+    {
+      "id": "niche_passage",
+      "name": "narrow gap",
+      "location": "stairwell",
+      "description": "A gap where the wall used to be, barely wide enough to squeeze through.",
+      "traits": { "exit": { "to": "niche", "direction": "into the gap", "hidden": true } }
+    },
 
     {
       "id": "cellar",
       "name": "cellar",
       "location": null,
-      "description": "Ankle-deep black water covers the floor. An iron chest squats against one wall; an iron door is set into the east wall. One brick near the floor sits a little crooked.",
+      "description": "Ankle-deep black water covers the floor. An iron chest squats against one wall; an iron door is set into the east wall. A torch sputters in a bracket by the door.",
       "traits": { "room": { "title": "Flooded Cellar" } }
     },
     {
@@ -51,6 +68,13 @@
       }
     },
     {
+      "id": "torch",
+      "name": "torch",
+      "location": "cellar",
+      "description": "A pitch-soaked torch, spitting and smoking. It would light any dark place.",
+      "traits": { "takeable": {}, "light": { "lit": true } }
+    },
+    {
       "id": "iron_chest",
       "name": "iron chest",
       "location": "cellar",
@@ -63,20 +87,6 @@
       "location": "iron_chest",
       "description": "A key flaked with orange rust.",
       "traits": { "takeable": {} }
-    },
-    {
-      "id": "loose_brick",
-      "name": "crooked brick",
-      "location": "cellar",
-      "description": "On closer inspection the brick is loose. You push it, and it slides inward.",
-      "traits": {}
-    },
-    {
-      "id": "niche_passage",
-      "name": "narrow gap",
-      "location": "cellar",
-      "description": "A gap where the wall used to be, barely wide enough to squeeze through.",
-      "traits": { "exit": { "to": "niche", "direction": "into the gap", "hidden": true } }
     },
     {
       "id": "goblin",
@@ -104,20 +114,23 @@
       "id": "niche",
       "name": "niche",
       "location": null,
-      "description": "A tight, dry space behind the wall. Someone scratched words into the plaster here.",
-      "traits": { "room": { "title": "Narrow Niche" } }
+      "description": "A tight, dry space behind the wall. Thin cracks in the far wall let in a flickering orange light, and someone scratched words into the plaster here.",
+      "traits": {
+        "room": { "title": "Narrow Niche", "sounds": "Beyond the cracks: water lapping, a torch hissing, and something shuffling back and forth, back and forth." },
+        "echo": { "from": "cellar", "muffled": "Through the cracks comes a low, muffled voice. You can't make out the words." }
+      }
     },
     {
       "id": "niche_out",
       "name": "narrow gap",
       "location": "niche",
-      "traits": { "exit": { "to": "cellar", "direction": "back out" } }
+      "traits": { "exit": { "to": "stairwell", "direction": "back out" } }
     },
     {
       "id": "scratched_words",
       "name": "scratched words",
       "location": "niche",
-      "description": "\"The heart sleeps behind iron. The guard is a coward: hurt him, and he runs.\"",
+      "description": "Scratched into the plaster in a shaky hand: \"The heart sleeps behind iron. Its guard is a coward: hurt him, and he runs. Take what beats, and lose what speaks.\"",
       "traits": {}
     },
 
@@ -236,7 +249,13 @@
   ],
   "goal": { "has": ["$actor", "clay_heart"] },
   "walkthrough": [
+    { "verb": "search" },
     { "verb": "take", "target": "old_shovel" },
+    { "verb": "look", "target": "loose_brick" },
+    { "verb": "go", "target": "niche_passage" },
+    { "verb": "look", "target": "scratched_words" },
+    { "verb": "listen" },
+    { "verb": "go", "target": "niche_out" },
     { "verb": "go", "target": "stairs_down" },
     { "verb": "attack", "target": "goblin" },
     { "verb": "attack", "target": "goblin" },

@@ -6,6 +6,12 @@ export type Listener = (event: GameEvent) => void;
 export type Locate = (actor: Id) => Id | null;
 
 /**
+ * For events that don't reach an actor directly: does it perceive them anyway, and how?
+ * Return a transformed event (muffled through a wall, words made clear by listening) or null.
+ */
+export type Overhear = (event: GameEvent, actor: Id) => GameEvent | null;
+
+/**
  * Slip: liquid clay that joins pieces together. The event bus.
  *
  * Every published event has a scope (room / actor / global). Perception is decided
@@ -18,10 +24,12 @@ export class Slip {
   readonly #perceived = new Map<Id, GameEvent[]>();
   readonly #memory: number;
   readonly #locate: Locate;
+  readonly #overhear: Overhear | undefined;
 
-  constructor(locate: Locate, options: { memory?: number } = {}) {
+  constructor(locate: Locate, options: { memory?: number; overhear?: Overhear } = {}) {
     this.#locate = locate;
     this.#memory = options.memory ?? 20;
+    this.#overhear = options.overhear;
   }
 
   /** Whether an actor, where it is now, perceives this event. */
@@ -34,6 +42,12 @@ export class Slip {
       case "room":
         return this.#locate(actor) === event.scope.room;
     }
+  }
+
+  /** What an actor perceives of an event: the event itself, a transformed version, or nothing. */
+  perceive(event: GameEvent, actor: Id): GameEvent | null {
+    if (this.reaches(event, actor)) return event;
+    return this.#overhear?.(event, actor) ?? null;
   }
 
   /**
@@ -54,12 +68,17 @@ export class Slip {
   publish(event: GameEvent): void {
     this.log.push(event);
     for (const [actor, memory] of this.#perceived) {
-      if (!this.reaches(event, actor)) continue;
-      memory.push(event);
+      const perceived = this.perceive(event, actor);
+      if (!perceived) continue;
+      memory.push(perceived);
       if (memory.length > this.#memory) memory.shift();
     }
     for (const { fn, actor } of [...this.#listeners]) {
-      if (actor === undefined || this.reaches(event, actor)) fn(event);
+      if (actor === undefined) fn(event);
+      else {
+        const perceived = this.perceive(event, actor);
+        if (perceived) fn(perceived);
+      }
     }
   }
 

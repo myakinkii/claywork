@@ -9,7 +9,7 @@ import { perspective } from "@claywork/slip";
 import { clarify, glaze, help, toText, understand, type MetaDoc } from "@claywork/glaze";
 import { FakeReflex, type FakeRule } from "@claywork/reflex";
 import { FakeReason } from "@claywork/reason";
-import { animate, brute, reflexPolicy, voice } from "@claywork/golems";
+import { MUTTER, animate, brute, reflexPolicy, voice } from "@claywork/golems";
 
 const path = resolve(process.argv[2] ?? "worlds/drowned-cellar.json");
 const tickMs = Number(process.env.TICK_MS ?? 2500);
@@ -34,12 +34,25 @@ const instincts: FakeRule = ({ key, question, state }) => {
   return Object.fromEntries(Object.keys(question.criteria).map((id) => [id, id.startsWith(prefer) ? 3 : 0]));
 };
 const reflex = new FakeReflex({ latencyMs: [60, 300], rules: [instincts] });
-const banter = new FakeReason(["Mine! Go away!", "Shiny things... you have shiny things?", "Door stays shut. Goblin says so."], { latencyMs: 400 });
+// A stand-in language model: replies when spoken to, and mutters secrets when it thinks it's alone.
+const replies = ["Mine! Go away!", "Shiny things... you have shiny things?", "Door stays shut. Goblin says so."];
+const mutters = [
+  "Nobody looks in the chest. Chest is heavy. Key is safe, hehe.",
+  "Goblin is not scared. Goblin is NOT scared.",
+  "Warm heart, shiny heart... but master said: touch it, and it eats your voice.",
+  "If they hit hard, goblin runs. Goblin always runs. Then goblin comes back.",
+];
+let replied = 0;
+let muttered = 0;
+const banter = new FakeReason(
+  (req) => (req.messages.at(-1)?.content === MUTTER ? mutters[muttered++ % mutters.length]! : replies[replied++ % replies.length]!),
+  { latencyMs: 400 },
+);
 
 for (const thing of wheel.world.things.values()) {
   if (thing.traits.actor?.kind !== "mob" && thing.traits.actor?.kind !== "npc") continue;
   animate(wheel, thing.id, { policy: reflexPolicy(reflex, { fallback: brute() }), fallback: brute(), deadlineMs: Math.min(800, tickMs / 2) });
-  voice(wheel, thing.id, banter);
+  voice(wheel, thing.id, banter, { mutter: { everyTicks: 4 } });
 }
 
 // --- the terminal ---------------------------------------------------------------
@@ -70,7 +83,7 @@ wheel.slip.subscribe((event) => {
 }, { actor: me });
 
 wheel.onTurn((events) => {
-  if (events.some((e) => e.actor === me && ["entered", "taken", "dropped", "opened", "unlocked"].includes(e.name)) || events.some((e) => e.name === "narration")) show();
+  if (events.some((e) => e.actor === me && ["entered", "taken", "dropped", "opened", "unlocked", "searched"].includes(e.name)) || events.some((e) => e.name === "narration")) show();
 });
 
 const meta: MetaDoc[] = [

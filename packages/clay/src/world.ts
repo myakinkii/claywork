@@ -8,10 +8,46 @@ import type { Id, Scalar, Scenario, Seen, Thing } from "./types.ts";
 export class World {
   readonly things = new Map<Id, Thing>();
   readonly flags = new Map<string, Scalar>();
+  /** What each actor has found by searching: perception that light alone doesn't give. */
+  readonly #known = new Map<Id, Set<Id>>();
 
   constructor(scenario: Pick<Scenario, "things" | "flags">) {
     for (const thing of structuredClone(scenario.things)) this.things.set(thing.id, thing);
     for (const [k, v] of Object.entries(scenario.flags ?? {})) this.flags.set(k, v);
+  }
+
+  // --- senses ------------------------------------------------------------------
+
+  knows(actor: Id, thing: Id): boolean {
+    return this.#known.get(actor)?.has(thing) ?? false;
+  }
+
+  learn(actor: Id, thing: Id): void {
+    const known = this.#known.get(actor) ?? new Set<Id>();
+    known.add(thing);
+    this.#known.set(actor, known);
+  }
+
+  /** A room is lit unless it is dark and no lit light is anywhere in it (carried ones count). */
+  isLit(roomId: Id): boolean {
+    if (!this.get(roomId).traits.dark) return true;
+    const walk = (id: Id): boolean =>
+      this.children(id).some((t) => t.traits.light?.lit === true || ((this.isOpen(t.id) || t.traits.actor !== undefined) && walk(t.id)));
+    return walk(roomId);
+  }
+
+  canSee(actor: Id): boolean {
+    const room = this.roomOf(actor);
+    return room !== null && !this.get(actor).traits.blind && this.isLit(room);
+  }
+
+  /**
+   * What an actor actually notices among the things in reach: everything visible
+   * if it can see (except concealed things), plus whatever it has found by touch.
+   */
+  perceivable(actor: Id): Thing[] {
+    const sees = this.canSee(actor);
+    return this.reachable(actor).filter((t) => this.knows(actor, t.id) || (sees && !t.traits.concealed));
   }
 
   get(id: Id): Thing {
@@ -154,6 +190,7 @@ export class World {
     const state: string[] = [];
     if (t.traits.openable) state.push(t.traits.openable.open ? "open" : "closed");
     if (t.traits.lockable?.locked) state.push("locked");
+    if (t.traits.light) state.push(t.traits.light.lit ? "lit" : "unlit");
     if (t.traits.vitals) {
       const { hp, maxHp } = t.traits.vitals;
       state.push(hp > 0 ? `hp ${hp}/${maxHp}` : "dead");
@@ -165,10 +202,11 @@ export class World {
   }
 
   /** A sherd: a serializable snapshot of the whole state. */
-  snapshot(): { things: Thing[]; flags: Record<string, Scalar> } {
+  snapshot(): { things: Thing[]; flags: Record<string, Scalar>; known: Record<Id, Id[]> } {
     return {
       things: structuredClone([...this.things.values()]),
       flags: Object.fromEntries(this.flags),
+      known: Object.fromEntries([...this.#known].map(([actor, ids]) => [actor, [...ids]])),
     };
   }
 }

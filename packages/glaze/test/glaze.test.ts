@@ -18,7 +18,7 @@ test("every thing carries its own actions as links", () => {
   assert.deepEqual(chest.links.map((l) => l.option), ["look:iron_chest", "open:iron_chest"]);
   assert.deepEqual(chest.state, ["closed"]);
   assert.deepEqual(view.exits.map((e) => e.name), ["up", "east"]);
-  assert.deepEqual(view.general.map((l) => l.label), ["look around", "wait"]);
+  assert.deepEqual(view.general.map((l) => l.label), ["look around", "search", "listen", "wait"]);
 });
 
 test("text numbers every link, in order", () => {

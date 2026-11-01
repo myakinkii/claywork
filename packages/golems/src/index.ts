@@ -176,13 +176,19 @@ export function animate(wheel: Wheel, actor: Id, options: AnimateOptions): Anima
 // --- voice: the slow, System Two side --------------------------------------------
 
 export interface VoiceOptions {
-  /** Max words remembered of the conversation. */
+  /** How many lines of conversation are remembered. */
   memory?: number;
+  /** Talk to itself every N ticks, whether anyone is there to hear or not. */
+  mutter?: { everyTicks: number; prompt?: string };
 }
 
+/** The instruction sent when a golem mutters; scripts and fakes can recognize it. */
+export const MUTTER = "(Nobody is talking to you. Mutter one short line to yourself about what is on your mind.)";
+
 /**
- * Give a golem a voice: when someone else speaks in its presence, it answers using a
- * language model, in character. Runs at its own pace, never blocking the wheel.
+ * Give a golem a voice. When someone else speaks in its presence it answers in
+ * character, and with `mutter` it also talks to itself now and then: fuel for anyone
+ * listening through a wall. Runs at its own pace, never blocking the wheel.
  */
 export function voice(wheel: Wheel, actor: Id, reason: Reason, options: VoiceOptions = {}): Animated {
   const stats = { decisions: 0, timeouts: 0, errors: 0, fallbacks: 0 };
@@ -190,10 +196,10 @@ export function voice(wheel: Wheel, actor: Id, reason: Reason, options: VoiceOpt
   const memory = options.memory ?? 12;
   let speaking = false;
 
-  const listen = async (event: GameEvent) => {
-    if (event.name !== "said" || event.actor === actor || speaking || !wheel.world.isAlive(actor)) return;
+  const speak = async (prompt: { role: "user"; content: string }, remember: boolean) => {
+    if (speaking || !wheel.world.has(actor) || !wheel.world.isAlive(actor)) return;
     speaking = true;
-    history.push({ role: "user", content: event.text });
+    if (remember) history.push(prompt);
     const me = wheel.world.get(actor);
     const traits = me.traits.actor;
     try {
@@ -206,12 +212,12 @@ export function voice(wheel: Wheel, actor: Id, reason: Reason, options: VoiceOpt
           `You are in: ${obs.room.title}. You see: ${obs.visible.map((v) => v.name).join(", ") || "nothing"}.`,
           "Reply with one short line of speech only, in character. No narration, no quotes.",
         ].filter(Boolean).join("\n"),
-        messages: history.slice(-memory),
+        messages: remember ? history.slice(-memory) : [...history.slice(-memory), prompt],
       });
       const line = res.text.trim().replace(/^"|"$/g, "");
-      history.push({ role: "assistant", content: line });
+      if (line) history.push({ role: "assistant", content: line });
       stats.decisions += 1;
-      if (line) wheel.submit({ actor, verb: "say", text: line });
+      if (line && wheel.world.isAlive(actor)) wheel.submit({ actor, verb: "say", text: line });
     } catch {
       stats.errors += 1;
     } finally {
@@ -219,6 +225,23 @@ export function voice(wheel: Wheel, actor: Id, reason: Reason, options: VoiceOpt
     }
   };
 
-  const unsubscribe = wheel.slip.subscribe((e) => void listen(e), { actor });
-  return { actor, stats, stop: unsubscribe };
+  const unsubscribe = wheel.slip.subscribe((event) => {
+    if (event.name === "said" && event.actor !== actor) void speak({ role: "user", content: event.text }, true);
+  }, { actor });
+
+  const mutter = options.mutter;
+  const unturn = mutter
+    ? wheel.onTurn(() => {
+        if (wheel.tick % mutter.everyTicks === 0) void speak({ role: "user", content: mutter.prompt ?? MUTTER }, false);
+      })
+    : () => {};
+
+  return {
+    actor,
+    stats,
+    stop: () => {
+      unsubscribe();
+      unturn();
+    },
+  };
 }

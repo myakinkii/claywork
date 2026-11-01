@@ -12,7 +12,17 @@ export type Scalar = string | number | boolean | null;
  */
 export interface Traits {
   /** A place an actor can stand in. Its location is usually null (or a zone). */
-  room?: { title?: string };
+  room?: { title?: string; /** What you hear when you listen here. */ sounds?: string };
+  /** The room is dark: without light, things must be found by touch (search). */
+  dark?: { /** Replaces the room description when you can't see. */ text?: string };
+  /** A light source. Lit lights anywhere in a room (even carried) make it visible. */
+  light?: { lit: boolean };
+  /** Not noticed even in light until someone searches. */
+  concealed?: {};
+  /** Sounds from another room reach this one, muffled unless you listen. */
+  echo?: { from: Id; /** What unclear speech sounds like here. */ muffled?: string };
+  /** This actor cannot see. */
+  blind?: {};
   /** A passage, located in a room, leading to another room. */
   exit?: { to: Id; direction?: string; hidden?: boolean };
   /** Can be picked up. */
@@ -26,8 +36,10 @@ export interface Traits {
     kind?: "player" | "npc" | "mob";
     persona?: string;
     goal?: string;
-    /** Consecutive ticks spent in chosen stillness (the "wait" verb). Maintained by the wheel. */
+    /** Consecutive ticks spent in chosen stillness (wait, listen). Maintained by the wheel. */
     still?: number;
+    /** Paying attention to sounds. Lasts while the actor stays still. */
+    listening?: boolean;
   };
   vitals?: { hp: number; maxHp: number };
   weapon?: { damage: number };
@@ -217,6 +229,8 @@ export interface Seen {
 
 export interface Observation {
   tick: number;
+  /** The actor cannot see: only things it has found are listed. */
+  dark: boolean;
   self: Seen & { carrying: Seen[] };
   room: { id: Id; title: string; description?: string };
   visible: Seen[];

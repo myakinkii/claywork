@@ -43,7 +43,7 @@ test("a walkthrough that gets blocked is reported with the world's words", () =>
   const crack = firing.cracks.find((c) => c.code === "step-blocked");
   assert.ok(crack, JSON.stringify(firing.cracks));
   assert.match(crack.message, /goblin hisses/);
-  assert.equal(crack.at, "walkthrough:5");
+  assert.equal(crack.at, `walkthrough:${s.walkthrough!.findIndex((step) => step.verb === "unlock") + 1}`);
 });
 
 test("a walkthrough that stops short does not reach the goal", () => {
@@ -79,4 +79,10 @@ test("an inability in the walkthrough is reported as such", () => {
   const crack = fire(s).cracks.find((c) => c.code === "step-unable");
   assert.ok(crack);
   assert.match(crack.message, /nothing comes out/);
+});
+
+test("echoes must come from real rooms", () => {
+  const s = cellar();
+  s.things.find((t) => t.id === "niche")!.traits.echo = { from: "attic" };
+  assert.ok(codes(s).includes("echo-from-nowhere"));
 });
