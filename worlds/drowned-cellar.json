@@ -138,8 +138,8 @@
       "id": "altar",
       "name": "stone altar",
       "location": "crypt",
-      "description": "A low altar, worn smooth by hands.",
-      "traits": { "container": { "transparent": true } }
+      "description": "A low altar, worn smooth by hands. Two hollows in the stone in front of it look like they were made by knees.",
+      "traits": { "container": { "transparent": true }, "shrine": {} }
     },
     {
       "id": "clay_heart",
@@ -149,6 +149,22 @@
       "traits": { "takeable": {} }
     }
   ],
+  "verbs": {
+    "say": {
+      "requires": [
+        { "unless": { "trait": ["$actor", "mute"] }, "fail": "You open your mouth, and nothing comes out." }
+      ]
+    },
+    "pray": {
+      "summary": "Kneel and pray. Some places listen.",
+      "phrase": "pray at",
+      "aliases": ["kneel"],
+      "appliesTo": { "trait": "shrine" },
+      "text": "{Actor} kneels before {target}.",
+      "you": "You kneel before {target} and pray.",
+      "nothing": "The stone is cold and silent."
+    }
+  },
   "triggers": [
     {
       "id": "brick_secret",
@@ -185,7 +201,36 @@
       "once": true,
       "then": [
         { "say": "As the heart leaves the altar, every clay figure on the shelves turns its head toward you." },
+        { "grant": ["$actor", "mute"] },
+        { "say": "Your throat goes cold. Something has taken your voice in exchange.", "to": "actor" },
         { "setFlag": "heart_taken" }
+      ]
+    },
+    {
+      "id": "altar_hums",
+      "on": "pray",
+      "target": "altar",
+      "if": [{ "at": ["clay_heart", "altar"] }],
+      "then": [{ "say": "Under your palms the altar hums, and the heart on it beats a little faster.", "to": "actor" }]
+    },
+    {
+      "id": "voice_returns",
+      "on": "pray",
+      "target": "altar",
+      "if": [{ "has": ["$actor", "clay_heart"] }, { "trait": ["$actor", "mute"] }],
+      "then": [
+        { "revoke": ["$actor", "mute"] },
+        { "say": "The heart warms in your hands. Your voice comes back, hoarse, but yours.", "to": "actor" }
+      ]
+    },
+    {
+      "id": "figures_move",
+      "on": "wait",
+      "once": true,
+      "if": [{ "at": ["$actor", "crypt"] }, { "still": ["$actor", 3] }],
+      "then": [
+        { "say": "In the stillness you hear it: hundreds of tiny clay feet shifting on the shelves. When you look up, every figure stands one step closer.", "to": "actor" },
+        { "setFlag": "figures_moved" }
       ]
     }
   ],
@@ -200,6 +245,12 @@
     { "verb": "unlock", "target": "crypt_door", "with": "rusty_key" },
     { "verb": "open", "target": "crypt_door" },
     { "verb": "go", "target": "crypt_door" },
-    { "verb": "take", "target": "clay_heart" }
+    { "verb": "pray", "target": "altar" },
+    { "verb": "wait" },
+    { "verb": "wait" },
+    { "verb": "wait" },
+    { "verb": "take", "target": "clay_heart" },
+    { "verb": "pray", "target": "altar" },
+    { "verb": "say", "text": "Thank you." }
   ]
 }

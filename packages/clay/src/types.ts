@@ -22,7 +22,13 @@ export interface Traits {
   openable?: { open: boolean };
   lockable?: { locked: boolean; key?: Id };
   /** Can act: players, NPCs, mobs. */
-  actor?: { kind?: "player" | "npc" | "mob"; persona?: string; goal?: string };
+  actor?: {
+    kind?: "player" | "npc" | "mob";
+    persona?: string;
+    goal?: string;
+    /** Consecutive ticks spent in chosen stillness (the "wait" verb). Maintained by the wheel. */
+    still?: number;
+  };
   vitals?: { hp: number; maxHp: number };
   weapon?: { damage: number };
   /** Anything else a world invents, e.g. lightable: { lit: false }. */
@@ -60,7 +66,11 @@ export type Condition =
   /** Trait property comparison, path like "openable.open" or "vitals.hp". */
   | { prop: [thing: Ref, path: string]; equals?: Scalar; gt?: number; lt?: number }
   /** Who triggered the event. */
-  | { actorIs: Ref };
+  | { actorIs: Ref }
+  /** Thing has a trait: { "trait": ["$actor", "mute"] }. */
+  | { trait: [thing: Ref, trait: string] }
+  /** Actor has stayed still (waited) for at least this many consecutive ticks. */
+  | { still: [actor: Ref, ticks: number] };
 
 export type Effect =
   /** Narration. Heard by the room of the actor, or only by the actor. */
@@ -72,6 +82,10 @@ export type Effect =
   | { reveal: Ref }
   /** Remove a thing from the world (moves it to nowhere). */
   | { destroy: Ref }
+  /** Give a thing a trait (a curse, a blessing, a new ability). */
+  | { grant: [thing: Ref, trait: string, props?: Record<string, Scalar>] }
+  /** Take a trait away. */
+  | { revoke: [thing: Ref, trait: string] }
   /** Only meaningful in "before" triggers: the verb does not happen. */
   | { block: true };
 
@@ -88,6 +102,40 @@ export interface Trigger {
   else?: Effect[];
   /** Fire at most once per world. */
   once?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Verbs as world configuration. Standard verbs are a library every world inherits;
+// a world can switch them off, restrict them, re-describe them, or add its own.
+// ---------------------------------------------------------------------------
+
+/**
+ * A condition the acting actor must meet. When it doesn't, the verb fails with
+ * flavor: the option is still offered, the world just says no.
+ */
+export interface Requirement {
+  if?: Condition;
+  unless?: Condition;
+  /** What the actor is told. Default: "You can't do that right now." */
+  fail?: string;
+}
+
+export interface VerbConfig {
+  summary?: string;
+  /** How to type it. Default: "<phrase> <thing>" or the name. */
+  usage?: string;
+  aliases?: string[];
+  requires?: Requirement[];
+  // --- world verbs only (ignored for standard verbs) ---
+  /** Which things the verb applies to. Omit for an untargeted verb ("pray", "sing"). */
+  appliesTo?: { trait?: string; ids?: Id[] };
+  /** Words before the target in labels: "pray at" -> "pray at stone altar". Default: the name. */
+  phrase?: string;
+  /** What everyone sees and what the actor is told. Templates: {actor} {Actor} {target} {Target}. */
+  text?: string;
+  you?: string;
+  /** Told to the actor when no trigger answered. Default: "Nothing happens." */
+  nothing?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +188,13 @@ export interface Scenario {
   things: Thing[];
   flags?: Record<string, Scalar>;
   triggers?: Trigger[];
+  /**
+   * Verb configuration: false switches a standard verb off (except "wait", the floor),
+   * an object restricts or re-describes a standard verb, or defines a new world verb.
+   */
+  verbs?: Record<string, VerbConfig | false>;
+  /** Template for joining players: extra traits (merged over the defaults) and starting hp. */
+  player?: { traits?: Traits; hp?: number };
   /** When this holds, the scenario is complete. "$actor" is the player. */
   goal?: Condition;
   /** A known solution, used by the Kiln to prove the scenario is winnable. */

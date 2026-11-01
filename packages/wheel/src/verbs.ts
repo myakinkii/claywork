@@ -10,6 +10,8 @@ export interface Performed {
   events: EventDraft[];
   /** Room the actor arrived in, so "enter" triggers can fire. */
   entered?: Id;
+  /** Told to the actor if no "after" trigger answers (world verbs: "Nothing happens."). */
+  silent?: string;
 }
 
 /**
@@ -19,6 +21,8 @@ export interface Performed {
  */
 export interface Verb {
   name: string;
+  /** "engine" for the standard library, "world" for verbs a scenario defines. */
+  origin?: "engine" | "world";
   /** One line for /help, world independent. */
   summary: string;
   /** How to type it, e.g. "take <thing>". */
@@ -356,7 +360,12 @@ const wait: Verb = {
   aliases: ["z"],
   options: (_world, actor) => [option(actor, "wait", undefined, "wait", "Do nothing for a moment.")],
   check: () => null,
-  perform: () => ({ events: [] }),
+  // Chosen stillness: the wheel resets the count whenever the actor does anything else.
+  perform({ world, actor }) {
+    const still = world.prop(actor, "actor.still");
+    world.setProp(actor, "actor.still", (typeof still === "number" ? still : 0) + 1);
+    return { events: [] };
+  },
 };
 
 export const standardVerbs: Verb[] = [look, go, take, drop, toggle("open", true), toggle("close", false), unlock, attack, say, wait];

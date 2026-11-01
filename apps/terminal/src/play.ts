@@ -65,8 +65,7 @@ wheel.slip.subscribe((event) => {
     shutdown();
   }
   if (event.actor === me && event.name === "won") {
-    print("\n" + perspective(event, me));
-    shutdown();
+    print("\nThe adventure is complete, but the world goes on. Stay as long as you like; /quit to leave.");
   }
 }, { actor: me });
 

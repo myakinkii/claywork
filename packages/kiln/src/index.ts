@@ -1,6 +1,6 @@
 import type { Condition, Effect, Id, Scenario, Thing } from "@claywork/clay";
 import { flagsRead, references } from "@claywork/glyphs";
-import { Wheel } from "@claywork/wheel";
+import { Wheel, standardVerbs } from "@claywork/wheel";
 
 export interface Crack {
   severity: "error" | "warning";
@@ -107,11 +107,49 @@ export function fire(scenario: Scenario): Firing {
   } else {
     warn("no-goal", "The scenario has no goal; it can never be completed.");
   }
-  for (const [flag, at] of flagsUsed) if (!flagsWritten.has(flag)) error("flag-never-set", `Reads flag "${flag}", which nothing ever sets.`, at);
 
   for (const t of scenario.things) {
     if (t.traits.exit?.hidden && !revealed.has(t.id)) warn("secret-never-revealed", `Hidden exit "${t.id}" is never revealed by any trigger.`, t.id);
   }
+
+  // --- verbs ------------------------------------------------------------------
+  const verbConfig = scenario.verbs ?? {};
+  const engine = new Set(standardVerbs.map((v) => v.name));
+  const known = new Set([...engine].filter((v) => verbConfig[v] !== false));
+  for (const [name, config] of Object.entries(verbConfig)) {
+    const at = `verb:${name}`;
+    if (config === false) {
+      if (name === "wait") error("wait-disabled", `"wait" cannot be switched off: every actor must always be able to let time pass.`, at);
+      else if (!engine.has(name)) warn("disable-unknown", `Switches off "${name}", which is not a standard verb.`, at);
+      continue;
+    }
+    known.add(name);
+    for (const req of config.requires ?? []) {
+      for (const cond of [req.if, req.unless]) {
+        if (!cond) continue;
+        checkRefs(cond, at);
+        for (const f of flagsRead(cond)) flagsUsed.set(f, at);
+      }
+      if (!req.fail) warn("silent-requirement", `A requirement has no "fail" message; players will get a generic refusal.`, at);
+    }
+    if (engine.has(name)) {
+      if (config.appliesTo || config.text || config.you || config.phrase) warn("ignored-config", `"${name}" is a standard verb; appliesTo, phrase, text and you only apply to world verbs.`, at);
+      continue;
+    }
+    if (!config.summary) warn("no-summary", `World verb "${name}" has no summary, so /help can't explain it.`, at);
+    for (const id of config.appliesTo?.ids ?? []) if (!exists(id)) error("missing-reference", `Applies to "${id}", which does not exist.`, at);
+    const trait = config.appliesTo?.trait;
+    if (trait && !scenario.things.some((t) => t.traits[trait] !== undefined)) warn("applies-to-nothing", `Applies to things with trait "${trait}", but nothing has it.`, at);
+    if (!triggers.some((t) => t.on === name)) warn("meaningless-verb", `World verb "${name}" has no triggers, so it can only ever say "Nothing happens."`, at);
+  }
+  for (const trig of triggers) {
+    if (trig.on !== "enter" && !known.has(trig.on)) error("unknown-verb", `Triggers on "${trig.on}", which is not a verb in this world.`, `trigger:${trig.id}`);
+  }
+  for (const [i, step] of (scenario.walkthrough ?? []).entries()) {
+    if (!known.has(step.verb)) error("unknown-verb", `Uses "${step.verb}", which is not a verb in this world.`, `walkthrough:${i + 1}`);
+  }
+
+  for (const [flag, at] of flagsUsed) if (!flagsWritten.has(flag)) error("flag-never-set", `Reads flag "${flag}", which nothing ever sets.`, at);
 
   // --- reachability (ignoring locks, counting revealable secrets) -------------
   if (isRoom(scenario.spawn)) {
@@ -166,15 +204,11 @@ export function simulate(scenario: Scenario): Crack[] {
       cracks.push({ severity: "error", code: "engine-error", message: `Step "${describe(step)}" crashed the engine: ${(e as Error).message}`, at });
       break;
     }
-    const failed = events.find((e) => e.actor === kiln && e.name === "failed");
-    const acted = events.some((e) => e.actor === kiln && e.name !== "failed");
-    if (failed) {
-      cracks.push({ severity: "error", code: "step-failed", message: `Step "${describe(step)}" failed: ${failed.text}`, at });
-      break;
-    }
-    if (!acted && step.verb !== "wait") {
-      const said = events.filter((e) => e.name === "narration").map((e) => e.text).join(" ");
-      cracks.push({ severity: "error", code: "step-blocked", message: `Step "${describe(step)}" was blocked.${said ? ` The world said: ${said}` : ""}`, at });
+    const outcome = wheel.outcome(kiln);
+    if (outcome !== "done") {
+      const said = events.map((e) => e.text).join(" ");
+      const code = outcome === "blocked" ? "step-blocked" : outcome === "unable" ? "step-unable" : "step-failed";
+      cracks.push({ severity: "error", code, message: `Step "${describe(step)}" was ${outcome ?? "not resolved"}.${said ? ` The world said: ${said}` : ""}`, at });
       break;
     }
   }

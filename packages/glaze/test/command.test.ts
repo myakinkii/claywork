@@ -79,3 +79,12 @@ test("help shows meta, the verb vocabulary and what is possible now, without sec
   assert.match(text, /attack: goblin/);
   assert.doesNotMatch(text, /gap|niche/i, "the secret passage is not revealed yet");
 });
+
+test("help separates the engine's verbs from the world's own", () => {
+  const { wheel } = setup();
+  const text = help(wheel.verbs(), wheel.options("anna"));
+  const [engine, world] = text.split("Verbs of this world:");
+  assert.match(engine!, /take <thing>/);
+  assert.doesNotMatch(engine!, /pray/);
+  assert.match(world!, /pray at <thing>\s+Kneel and pray\. Some places listen\. \(also: kneel\)/);
+});

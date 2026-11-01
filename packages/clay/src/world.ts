@@ -84,6 +84,19 @@ export class World {
     bag[key] = value;
   }
 
+  hasTrait(id: Id, trait: string): boolean {
+    return this.get(id).traits[trait] !== undefined;
+  }
+
+  grant(id: Id, trait: string, props: Record<string, Scalar> = {}): void {
+    const thing = this.get(id);
+    thing.traits[trait] = { ...(thing.traits[trait] ?? {}), ...props };
+  }
+
+  revoke(id: Id, trait: string): void {
+    delete this.get(id).traits[trait];
+  }
+
   isAlive(id: Id): boolean {
     const vitals = this.get(id).traits.vitals;
     return !vitals || vitals.hp > 0;

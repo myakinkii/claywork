@@ -19,6 +19,8 @@ export interface VerbDoc {
   usage: string;
   aliases?: string[];
   freeText?: boolean;
+  /** "engine" verbs exist in every world; "world" verbs only in this one. */
+  origin?: "engine" | "world";
 }
 
 export interface MetaDoc {
@@ -143,12 +145,12 @@ export function help(verbs: VerbDoc[], options: Option[], meta: MetaDoc[] = []):
   };
   const lines: string[] = [];
   if (meta.length) lines.push("Talking to the game (outside the world):", ...pad(meta.map((m) => [m.usage, m.summary])), "");
-  lines.push(
-    "Verbs:",
-    ...pad(verbs.map((v) => [v.usage, `${v.summary}${v.aliases?.length ? ` (also: ${v.aliases.join(", ")})` : ""}`])),
-    "",
-    "Right now you can:",
-  );
+  const describe = (v: VerbDoc): [string, string] => [v.usage, `${v.summary}${v.aliases?.length ? ` (also: ${v.aliases.join(", ")})` : ""}`];
+  const engine = verbs.filter((v) => v.origin !== "world");
+  const local = verbs.filter((v) => v.origin === "world");
+  lines.push("Verbs:", ...pad(engine.map(describe)), "");
+  if (local.length) lines.push("Verbs of this world:", ...pad(local.map(describe)), "");
+  lines.push("Right now you can:");
   const byVerb = new Map<string, string[]>();
   for (const o of options) byVerb.set(o.intent.verb, [...(byVerb.get(o.intent.verb) ?? []), rest(o.label)]);
   for (const [verb, targets] of byVerb) {

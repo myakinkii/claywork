@@ -45,6 +45,15 @@ export function check(cond: Condition, ctx: GlyphContext): boolean {
     return true;
   }
   if ("actorIs" in cond) return ctx.actor === resolve(cond.actorIs, ctx);
+  if ("trait" in cond) {
+    const [thing, trait] = cond.trait;
+    return world.hasTrait(resolve(thing, ctx), trait);
+  }
+  if ("still" in cond) {
+    const [actor, ticks] = cond.still;
+    const still = world.prop(resolve(actor, ctx), "actor.still");
+    return typeof still === "number" && still >= ticks;
+  }
   throw new Error(`Unknown condition: ${JSON.stringify(cond)}`);
 }
 
@@ -79,6 +88,12 @@ export function apply(effects: Effect[], ctx: GlyphContext): Applied {
       world.setProp(resolve(effect.reveal, ctx), "exit.hidden", false);
     } else if ("destroy" in effect) {
       world.move(resolve(effect.destroy, ctx), null);
+    } else if ("grant" in effect) {
+      const [thing, trait, props] = effect.grant;
+      world.grant(resolve(thing, ctx), trait, props ?? {});
+    } else if ("revoke" in effect) {
+      const [thing, trait] = effect.revoke;
+      world.revoke(resolve(thing, ctx), trait);
     } else if ("block" in effect) {
       result.blocked = true;
     } else {
@@ -126,6 +141,10 @@ export function references(node: Condition | Effect): Id[] {
     else if ("at" in n) add(...n.at);
     else if ("prop" in n) add(n.prop[0]);
     else if ("actorIs" in n) add(n.actorIs);
+    else if ("trait" in n) add(n.trait[0]);
+    else if ("still" in n) add(n.still[0]);
+    else if ("grant" in n) add(n.grant[0]);
+    else if ("revoke" in n) add(n.revoke[0]);
     else if ("set" in n) add(n.set[0]);
     else if ("move" in n) add(...n.move);
     else if ("reveal" in n) add(n.reveal);

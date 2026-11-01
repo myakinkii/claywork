@@ -1,8 +1,12 @@
 import { World } from "@claywork/clay";
-import type { DecisionPoint, EventDraft, GameEvent, Id, Intent, Observation, Option, Scenario, Thing } from "@claywork/clay";
+import type { DecisionPoint, EventDraft, GameEvent, Id, Intent, Observation, Option, Requirement, Scenario, Thing } from "@claywork/clay";
 import { fire, check } from "@claywork/glyphs";
 import { Slip, perspective } from "@claywork/slip";
 import { standardVerbs, type Verb } from "./verbs.ts";
+import { redescribe, worldVerb } from "./world-verbs.ts";
+
+/** How an intent turned out, for simulations and tests. */
+export type Outcome = "done" | "failed" | "unable" | "blocked";
 
 export interface WheelOptions {
   verbs?: Verb[];
@@ -30,6 +34,8 @@ export class Wheel {
   tick = 0;
 
   readonly #verbs = new Map<string, Verb>();
+  readonly #requirements = new Map<string, Requirement[]>();
+  readonly #outcomes = new Map<Id, Outcome>();
   readonly #queue = new Map<Id, Intent>();
   readonly #fired = new Set<string>();
   readonly #turnListeners = new Set<(events: GameEvent[]) => void>();
@@ -40,19 +46,29 @@ export class Wheel {
     this.scenario = scenario;
     this.world = new World(scenario);
     this.slip = new Slip((id) => (this.world.has(id) ? this.world.roomOf(id) : null), { memory: options.memory ?? 20 });
-    for (const verb of options.verbs ?? standardVerbs) this.#verbs.set(verb.name, verb);
+    for (const verb of options.verbs ?? standardVerbs) this.#verbs.set(verb.name, { origin: "engine", ...verb });
+    for (const [name, config] of Object.entries(scenario.verbs ?? {})) {
+      const base = this.#verbs.get(name);
+      if (config === false) {
+        if (name === "wait") throw new Error(`"wait" cannot be switched off: it is the floor every decision stands on`);
+        this.#verbs.delete(name);
+        continue;
+      }
+      this.#verbs.set(name, base ? redescribe(base, config) : worldVerb(name, config));
+      if (config.requires?.length) this.#requirements.set(name, config.requires);
+    }
     for (const thing of this.world.things.values()) if (thing.traits.actor) this.slip.track(thing.id);
   }
 
   /** A player joins the running world at the spawn room. */
   join(player: Player): Thing {
-    const hp = player.hp ?? 20;
+    const hp = player.hp ?? this.scenario.player?.hp ?? 20;
     const thing = this.world.add({
       id: player.id,
       name: player.name,
       ...(player.description ? { description: player.description } : {}),
       location: this.scenario.spawn,
-      traits: { actor: { kind: "player" }, vitals: { hp, maxHp: hp } },
+      traits: { ...structuredClone(this.scenario.player?.traits ?? {}), actor: { kind: "player" }, vitals: { hp, maxHp: hp } },
     });
     this.slip.track(thing.id);
     this.#publish([
@@ -78,6 +94,7 @@ export class Wheel {
     this.tick += 1;
     const intents = [...this.#queue.values()];
     this.#queue.clear();
+    this.#outcomes.clear();
     const produced: GameEvent[] = [];
     for (const intent of intents) produced.push(...this.#publish(this.#resolve(intent)));
     produced.push(...this.#publish(this.#checkGoals()));
@@ -105,15 +122,21 @@ export class Wheel {
     );
   }
 
-  /** The world-independent vocabulary: every verb this wheel understands. */
-  verbs(): Pick<Verb, "name" | "summary" | "usage" | "aliases" | "freeText">[] {
-    return [...this.#verbs.values()].map(({ name, summary, usage, aliases, freeText }) => ({
+  /** The vocabulary of this world: engine verbs it kept, plus verbs it defined. */
+  verbs(): Pick<Verb, "name" | "summary" | "usage" | "aliases" | "freeText" | "origin">[] {
+    return [...this.#verbs.values()].map(({ name, summary, usage, aliases, freeText, origin }) => ({
       name,
       summary,
       usage,
+      origin: origin ?? "engine",
       ...(aliases ? { aliases } : {}),
       ...(freeText ? { freeText } : {}),
     }));
+  }
+
+  /** How the actor's intent turned out on the last turn, if it had one. */
+  outcome(actor: Id): Outcome | undefined {
+    return this.#outcomes.get(actor);
   }
 
   /** What an actor perceives, ready to render (glaze) or to send to a model (golems). */
@@ -152,23 +175,40 @@ export class Wheel {
 
   #resolve(intent: Intent): EventDraft[] {
     const { world } = this;
-    const fail = (text: string): EventDraft[] => [{ name: "failed", scope: { kind: "actor", actor: intent.actor }, actor: intent.actor, text, you: text }];
+    const actor = intent.actor;
+    const say = (name: string, text: string): EventDraft => ({ name, scope: { kind: "actor", actor }, actor, text, you: text });
+    const outcome = (o: Outcome, events: EventDraft[]) => {
+      this.#outcomes.set(actor, o);
+      return events;
+    };
 
-    if (!world.has(intent.actor) || !world.isAlive(intent.actor)) return [];
+    if (!world.has(actor) || !world.isAlive(actor)) return [];
+    // Doing anything at all breaks stillness; "wait" counts it back up.
+    if (intent.verb !== "wait" && world.get(actor).traits.actor) world.setProp(actor, "actor.still", 0);
+
     const verb = this.#verbs.get(intent.verb);
-    if (!verb) return fail(`You don't know how to ${intent.verb}.`);
-    const ctx = { world, actor: intent.actor, intent };
+    if (!verb) return outcome("failed", [say("failed", `You don't know how to ${intent.verb}.`)]);
+
+    // Inability is the world's to describe, and comes before any other problem.
+    const glyphCtx = { world, actor, ...(intent.target ? { target: intent.target } : {}) };
+    for (const req of this.#requirements.get(verb.name) ?? []) {
+      const ok = (!req.if || check(req.if, glyphCtx)) && (!req.unless || !check(req.unless, glyphCtx));
+      if (!ok) return outcome("unable", [say("unable", req.fail ?? "You can't do that right now.")]);
+    }
+
+    const ctx = { world, actor, intent };
     const problem = verb.check(ctx);
-    if (problem) return fail(problem);
+    if (problem) return outcome("failed", [say("failed", problem)]);
 
     const triggers = this.scenario.triggers ?? [];
-    const glyphCtx = { world, actor: intent.actor, ...(intent.target ? { target: intent.target } : {}) };
     const before = fire(triggers, { on: verb.name, phase: "before" }, glyphCtx, this.#fired);
-    if (before.blocked) return before.events;
+    if (before.blocked) return outcome("blocked", before.events);
 
     const performed = verb.perform(ctx);
     const after = fire(triggers, { on: verb.name, phase: "after" }, glyphCtx, this.#fired);
     const events = [...before.events, ...performed.events, ...after.events];
+    if (performed.silent && after.events.length === 0) events.push(say("nothing", performed.silent));
+    this.#outcomes.set(actor, "done");
     if (performed.entered) {
       const enter = fire(triggers, { on: "enter", phase: "after" }, { world, actor: intent.actor, target: performed.entered }, this.#fired);
       events.push(...enter.events);

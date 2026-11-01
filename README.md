@@ -72,10 +72,33 @@ A world is a JSON `Scenario` (see `packages/clay/src/types.ts` and `worlds/drown
 }
 ```
 
+## Verbs are part of the world
+
+The engine ships a library of standard verbs (look, go, take, drop, open, close, unlock, attack, say, wait). A world inherits them, and can:
+
+- **switch them off**: `"attack": false` (a world without violence). Everything except `wait`: letting time pass is the floor every decision stands on;
+- **restrict them**: `requires` conditions on the actor. When unmet, the verb still exists and is still offered, but fails with the world's own words;
+- **re-describe them**: new summary or extra aliases;
+- **add its own**: data verbs with `appliesTo`, a `phrase` and templated `text`/`you`. Their meaning comes entirely from glyph triggers; if none answers, "Nothing happens."
+
+```json
+"verbs": {
+  "say": { "requires": [{ "unless": { "trait": ["$actor", "mute"] }, "fail": "You open your mouth, and nothing comes out." }] },
+  "pray": {
+    "summary": "Kneel and pray. Some places listen.",
+    "phrase": "pray at", "aliases": ["kneel"], "appliesTo": { "trait": "shrine" },
+    "you": "You kneel before {target} and pray.", "text": "{Actor} kneels before {target}."
+  }
+}
+```
+
+Glyphs can `grant` and `revoke` traits (curses, blessings, a stolen voice), test them with `{ "trait": [...] }`, and react to **stillness**: `wait` is chosen stillness, counted per actor (`{ "still": ["$actor", 3] }`), broken by any other action. Idleness (sending nothing) neither counts nor breaks it. In the Drowned Cellar, the clay figures only move while you hold still.
+
 ## Next
 
 - Real adapters behind `Reflex` (a Jev / djev-run HTTP client) and `Reason` (any LLM API), keeping the fakes for tests.
 - ADK (TypeScript) agents as `Policy` / voice implementations for slow NPCs.
 - The deliberation gate: a Noul answer that wakes System Two to update a golem's goal.
 - A world server (websocket) with glaze rendered in the browser.
+- Senses: sight, hearing and darkness filtering perception (World.reachable and Slip), plus attention verbs like `listen`.
 - JSON Schema for scenarios, then the potter.

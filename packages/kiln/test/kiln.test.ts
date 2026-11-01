@@ -48,6 +48,35 @@ test("a walkthrough that gets blocked is reported with the world's words", () =>
 
 test("a walkthrough that stops short does not reach the goal", () => {
   const s = cellar();
-  s.walkthrough = s.walkthrough!.slice(0, -1);
+  s.walkthrough = s.walkthrough!.slice(0, s.walkthrough!.findIndex((step) => step.target === "clay_heart"));
   assert.deepEqual(codes(s), ["goal-not-reached"]);
+});
+
+test("verb configuration is checked", () => {
+  const s = cellar();
+  s.verbs = { ...s.verbs, wait: false, dance: { summary: "Dance." }, sing: { summary: "Sing.", appliesTo: { trait: "stage" } } };
+  s.triggers!.push({ id: "juggle", on: "juggle", then: [{ say: "Whee." }] });
+  const c = codes(s);
+  assert.ok(c.includes("wait-disabled"));
+  assert.ok(c.includes("meaningless-verb"), "dance has no triggers");
+  assert.ok(c.includes("applies-to-nothing"), "nothing is a stage");
+  assert.ok(c.includes("unknown-verb"), "juggle is not a verb here");
+});
+
+test("switching off a verb the walkthrough needs is caught before simulation", () => {
+  const s = cellar();
+  s.verbs = { ...s.verbs, attack: false };
+  const c = codes(s);
+  assert.ok(c.includes("unknown-verb"));
+  assert.ok(!c.includes("step-blocked"), "structural errors stop the simulation");
+});
+
+test("an inability in the walkthrough is reported as such", () => {
+  const s = cellar();
+  // Skip the prayer that returns the voice: the final "say" must then fail.
+  const heart = s.walkthrough!.findIndex((step) => step.target === "clay_heart");
+  s.walkthrough!.splice(heart + 1, 1);
+  const crack = fire(s).cracks.find((c) => c.code === "step-unable");
+  assert.ok(crack);
+  assert.match(crack.message, /nothing comes out/);
 });
