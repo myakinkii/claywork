@@ -116,3 +116,4 @@ export function toHtml(view: View): string {
 }
 
 export { understand, help, clarify, type Command, type CommandContext, type VerbDoc, type MetaDoc } from "./command.ts";
+export { runs, toSvg, toAnsi, toPlain, width as spriteWidth, type Run } from "./art.ts";

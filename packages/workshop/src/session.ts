@@ -1,4 +1,4 @@
-import type { Id } from "@claywork/clay";
+import type { GameEvent, Id } from "@claywork/clay";
 import { perspective } from "@claywork/slip";
 import { glaze, help, understand, clarify, type MetaDoc } from "@claywork/glaze";
 import type { Instance } from "./instance.ts";
@@ -9,6 +9,7 @@ export type Send = (message: ServerMessage) => void;
 export const META: MetaDoc[] = [
   { usage: "/help, /?", summary: "This overview." },
   { usage: "/look", summary: "Describe where you are again (or send an empty line)." },
+  { usage: "/art on, /art off", summary: "Show or hide the pictures that come with some moments." },
   { usage: "/leave", summary: "Leave this world and return to the lobby." },
 ];
 
@@ -67,8 +68,7 @@ export class Session {
     this.instance = instance;
     this.actor = instance.join(this, name);
     this.#unsubscribe = instance.wheel.slip.subscribe((event) => {
-      if (!this.actor) return;
-      this.send({ type: "event", name: event.name, text: perspective(event, this.actor), mine: event.actor === this.actor, tick: event.tick });
+      if (this.actor) this.#event(event);
     }, { actor: this.actor });
     this.#greet();
   }
@@ -150,11 +150,21 @@ export class Session {
   #greet(): void {
     if (!this.instance || !this.actor) return;
     const { wheel } = this.instance;
-    this.send({ type: "joined", instance: this.instance.info(), actor: this.actor });
+    this.send({ type: "joined", instance: this.instance.info(), actor: this.actor, art: this.instance.world.scenario.art ?? {} });
     // The intro and anything else remembered: Slip has been tracking this actor since it joined.
-    for (const event of wheel.slip.recent(this.actor, 10)) {
-      this.send({ type: "event", name: event.name, text: perspective(event, this.actor), mine: event.actor === this.actor, tick: event.tick });
-    }
+    for (const event of wheel.slip.recent(this.actor, 10)) this.#event(event);
     this.refresh(true);
+  }
+
+  #event(event: GameEvent): void {
+    const actor = this.actor!;
+    this.send({
+      type: "event",
+      name: event.name,
+      text: perspective(event, actor),
+      mine: event.actor === actor,
+      tick: event.tick,
+      ...(event.art ? { art: event.art } : {}),
+    });
   }
 }

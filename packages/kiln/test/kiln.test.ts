@@ -86,3 +86,13 @@ test("echoes must come from real rooms", () => {
   s.things.find((t) => t.id === "niche")!.traits.echo = { from: "attic" };
   assert.ok(codes(s).includes("echo-from-nowhere"));
 });
+
+test("art is fired too: shape, colors, references", () => {
+  const s = cellar();
+  s.art!.broken = { palette: { A: "red", "..": "#ffffff" }, rows: ["AAB", "AA"] };
+  s.things.find((t) => t.id === "torch")!.art = "flame";
+  const c = codes(s);
+  for (const code of ["ragged-art", "bad-color", "bad-palette-key", "unknown-color", "missing-art", "unused-art"]) assert.ok(c.includes(code), code);
+  s.art!.huge = { palette: { A: "#000000" }, rows: Array(70).fill("A".repeat(80)) };
+  assert.ok(codes(s).includes("art-too-big"));
+});

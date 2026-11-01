@@ -49,10 +49,29 @@ export interface Traits {
   [trait: string]: Record<string, Scalar | undefined> | undefined;
 }
 
+// ---------------------------------------------------------------------------
+// Art: pixel sprites written as text. Each row is one line of pixels, one character
+// per pixel; "." is transparent and every other character is a palette color.
+// ---------------------------------------------------------------------------
+
+export interface Sprite {
+  /** Single character -> CSS hex color, e.g. { "O": "#2a2a2a" }. */
+  palette: Record<string, string>;
+  rows: string[];
+}
+
+/**
+ * Which sprite a thing shows: one id, or a default plus variants chosen by glyph
+ * conditions ("$target" is the thing itself), first match wins.
+ */
+export type ArtRef = string | { default: string; when?: { if: Condition; use: string }[] };
+
 export interface Thing {
   id: Id;
   name: string;
   description?: string;
+  /** Shown as a cut scene when the thing is first seen, or looked at. Rooms show it on first sight. */
+  art?: ArtRef;
   /** The container: a room, a chest, an actor's inventory. null = nowhere / top level. */
   location: Id | null;
   aliases?: string[];
@@ -87,8 +106,8 @@ export type Condition =
   | { still: [actor: Ref, ticks: number] };
 
 export type Effect =
-  /** Narration. Heard by the room of the actor, or only by the actor. */
-  | { say: string; to?: "room" | "actor" }
+  /** Narration, optionally with a cut scene. Heard by the room of the actor, or only by the actor. */
+  | { say: string; to?: "room" | "actor"; art?: string }
   | { set: [thing: Ref, path: string, value: Scalar] }
   | { move: [thing: Ref, destination: Ref | null] }
   | { setFlag: string; value?: Scalar }
@@ -185,6 +204,8 @@ export interface GameEvent {
   you?: string;
   /** Second person text, for the target when it perceives ("The goblin hits you."). */
   them?: string;
+  /** A sprite id from the world's art library: this moment comes with a picture. */
+  art?: string;
   data?: Record<string, Scalar>;
 }
 
@@ -209,6 +230,8 @@ export interface Scenario {
    * an object restricts or re-describes a standard verb, or defines a new world verb.
    */
   verbs?: Record<string, VerbConfig | false>;
+  /** The world's sprites, by id. */
+  art?: Record<string, Sprite>;
   /** Template for joining players: extra traits (merged over the defaults) and starting hp. */
   player?: { traits?: Traits; hp?: number };
   /** When this holds, the scenario is complete. "$actor" is the player. */

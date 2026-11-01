@@ -25,11 +25,16 @@ export class Slip {
   readonly #memory: number;
   readonly #locate: Locate;
   readonly #overhear: Overhear | undefined;
+  readonly #adapt: ((event: GameEvent, actor: Id) => GameEvent) | undefined;
 
-  constructor(locate: Locate, options: { memory?: number; overhear?: Overhear } = {}) {
+  constructor(
+    locate: Locate,
+    options: { memory?: number; overhear?: Overhear; adapt?: (event: GameEvent, actor: Id) => GameEvent } = {},
+  ) {
     this.#locate = locate;
     this.#memory = options.memory ?? 20;
     this.#overhear = options.overhear;
+    this.#adapt = options.adapt;
   }
 
   /** Whether an actor, where it is now, perceives this event. */
@@ -46,7 +51,7 @@ export class Slip {
 
   /** What an actor perceives of an event: the event itself, a transformed version, or nothing. */
   perceive(event: GameEvent, actor: Id): GameEvent | null {
-    if (this.reaches(event, actor)) return event;
+    if (this.reaches(event, actor)) return this.#adapt ? this.#adapt(event, actor) : event;
     return this.#overhear?.(event, actor) ?? null;
   }
 

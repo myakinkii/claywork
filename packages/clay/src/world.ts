@@ -10,6 +10,8 @@ export class World {
   readonly flags = new Map<string, Scalar>();
   /** What each actor has found by searching: perception that light alone doesn't give. */
   readonly #known = new Map<Id, Set<Id>>();
+  /** What each actor remembers having experienced: first sights, moments. */
+  readonly #memory = new Map<Id, Set<string>>();
 
   constructor(scenario: Pick<Scenario, "things" | "flags">) {
     for (const thing of structuredClone(scenario.things)) this.things.set(thing.id, thing);
@@ -26,6 +28,19 @@ export class World {
     const known = this.#known.get(actor) ?? new Set<Id>();
     known.add(thing);
     this.#known.set(actor, known);
+  }
+
+  /** Remember something; true if it is new to this actor ("first time I see this room"). */
+  remember(actor: Id, key: string): boolean {
+    const memory = this.#memory.get(actor) ?? new Set<string>();
+    if (memory.has(key)) return false;
+    memory.add(key);
+    this.#memory.set(actor, memory);
+    return true;
+  }
+
+  remembers(actor: Id, key: string): boolean {
+    return this.#memory.get(actor)?.has(key) ?? false;
   }
 
   /** A room is lit unless it is dark and no lit light is anywhere in it (carried ones count). */
@@ -203,11 +218,12 @@ export class World {
   }
 
   /** A sherd: a serializable snapshot of the whole state. */
-  snapshot(): { things: Thing[]; flags: Record<string, Scalar>; known: Record<Id, Id[]> } {
+  snapshot(): { things: Thing[]; flags: Record<string, Scalar>; known: Record<Id, Id[]>; memory: Record<Id, string[]> } {
     return {
       things: structuredClone([...this.things.values()]),
       flags: Object.fromEntries(this.flags),
       known: Object.fromEntries([...this.#known].map(([actor, ids]) => [actor, [...ids]])),
+      memory: Object.fromEntries([...this.#memory].map(([actor, keys]) => [actor, [...keys]])),
     };
   }
 }

@@ -33,3 +33,19 @@ test("html links carry option ids and escape content", () => {
   assert.match(html, /data-option="attack:goblin"/);
   assert.doesNotMatch(html, /<script/);
 });
+
+test("art renders as svg runs, ansi half-blocks, or the plain grid", async () => {
+  const { runs, toSvg, toAnsi, toPlain } = await import("@claywork/glaze");
+  const sprite = { palette: { A: "#ff0000", B: "#0000ff" }, rows: ["AAB.", "A..B"] };
+  assert.deepEqual(runs(sprite), [
+    { x: 0, y: 0, width: 2, fill: "#ff0000" },
+    { x: 2, y: 0, width: 1, fill: "#0000ff" },
+    { x: 0, y: 1, width: 1, fill: "#ff0000" },
+    { x: 3, y: 1, width: 1, fill: "#0000ff" },
+  ]);
+  assert.match(toSvg(sprite, { scale: 3 }), /viewBox="0 0 4 2" width="12" height="6"/);
+  const ansi = toAnsi(sprite);
+  assert.equal(ansi.split("\n").length, 1, "two pixel rows per line");
+  assert.match(ansi, /38;2;255;0;0m\x1b\[48;2;255;0;0m▀/, "red over red");
+  assert.equal(toPlain(sprite), "AAB\nA  B");
+});

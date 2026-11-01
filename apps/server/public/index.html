@@ -101,6 +101,20 @@
   .log .err { color: var(--iron); font-size: .95rem; }
   .log pre { font: .8rem/1.5 var(--mono); color: var(--muted); white-space: pre-wrap; background: var(--surface); border: 1px solid var(--rule); border-radius: 3px; padding: .75rem 1rem; max-width: none; }
   .log .died { font-size: 1.3rem; font-style: italic; color: var(--iron); margin: 1rem 0; }
+
+  /* Cut scenes: a moment that comes with a picture. The art carries its own palette,
+     so it sits on a near-black mat in both themes, like a lantern slide. */
+  .scene { margin: 1.25rem 0 1.4rem; max-width: 30rem; }
+  .scene .mat { background: #0a0c0c; border-radius: 2px; padding: .6rem; line-height: 0; }
+  .scene svg { width: 100%; height: auto; display: block; }
+  .scene figcaption { margin-top: .55rem; }
+  .scene.world-says figcaption { font-style: italic; }
+  .scene.small { max-width: 15rem; }
+  @media (prefers-reduced-motion: no-preference) {
+    .scene .mat { animation: develop 1.6s ease-out both; }
+    .scene figcaption { animation: develop 1s ease-out .9s both; }
+    @keyframes develop { from { opacity: 0; filter: brightness(.2); } to { opacity: 1; filter: none; } }
+  }
   .prompt { display: flex; gap: .5rem; padding: .75rem 1.5rem 1rem; border-top: 1px solid var(--rule); background: var(--surface); }
   .prompt input { flex: 1; font: inherit; background: transparent; color: var(--ink); border: 0; border-bottom: 1px solid var(--rule); padding: .3rem 0; }
   .prompt input:focus { outline: none; border-bottom-color: var(--cobalt); }
@@ -176,7 +190,8 @@ const el = (tag, props = {}, ...kids) => {
   return node;
 };
 
-const state = { token: null, socket: null, lobby: null, view: null, dead: false, open: new Set(), history: [], at: -1, retry: 0 };
+const state = { token: null, socket: null, lobby: null, view: null, dead: false, open: new Set(), history: [], at: -1, retry: 0, art: {}, showArt: true };
+try { state.showArt = localStorage.getItem("claywork-art") !== "off"; } catch {}
 try { state.token = localStorage.getItem("claywork-token"); } catch {}
 try { $("name").value = localStorage.getItem("claywork-name") || ""; } catch {}
 
@@ -208,6 +223,7 @@ function receive(m) {
       state.lobby = m;
       return showLobby();
     case "joined":
+      state.art = m.art || {};
       return showWorld(m);
     case "party":
       $("party").textContent = m.members.length > 1 ? `With ${party(m.members.filter((x) => !x.you))}` : "Alone";
@@ -285,7 +301,28 @@ function log(node) {
 
 function logEvent(m) {
   const kind = m.name === "narration" ? "world-says" : m.name === "overheard" ? "heard" : m.mine ? "mine" : "other";
-  log(el("p", { className: kind, textContent: m.text }));
+  const sprite = m.art && state.showArt ? state.art[m.art] : null;
+  if (!sprite) return log(el("p", { className: kind, textContent: m.text }));
+  const wide = sprite.rows[0].length >= 48;
+  const mat = el("div", { className: "mat" });
+  mat.innerHTML = svg(sprite);
+  log(el("figure", { className: `scene ${kind}${wide ? "" : " small"}` }, mat, el("figcaption", { textContent: m.text })));
+}
+
+/** Pixel art as SVG: horizontal runs of one color, crisp at any size. */
+function svg(sprite) {
+  const w = sprite.rows[0].length, h = sprite.rows.length;
+  let rects = "";
+  sprite.rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; ) {
+      let end = x + 1;
+      while (row[end] === row[x]) end++;
+      const fill = sprite.palette[row[x]];
+      if (fill && /^#[0-9a-f]{6}$/i.test(fill)) rects += `<rect x="${x}" y="${y}" width="${end - x}" height="1" fill="${fill}"/>`;
+      x = end;
+    }
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
 }
 
 function renderHere() {
@@ -333,6 +370,14 @@ $("prompt").addEventListener("submit", (e) => {
   e.preventDefault();
   const input = $("command");
   const text = input.value;
+  const artCommand = /^\/art\s+(on|off)\s*$/i.exec(text.trim());
+  if (artCommand) {
+    state.showArt = artCommand[1].toLowerCase() === "on";
+    try { localStorage.setItem("claywork-art", state.showArt ? "on" : "off"); } catch {}
+    log(el("p", { className: "note", textContent: state.showArt ? "Pictures are on." : "Pictures are off. /art on brings them back." }));
+    input.value = "";
+    return;
+  }
   if (text.trim()) {
     log(el("p", { className: "typed", textContent: `› ${text}` }));
     state.history.push(text);

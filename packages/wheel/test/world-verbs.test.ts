@@ -10,6 +10,7 @@ function inCrypt(scenario: Scenario = cellar()) {
   const wheel = new Wheel(scenario);
   wheel.join({ id: "anna", name: "Anna" });
   wheel.world.move("anna", "crypt");
+  wheel.world.remember("anna", "sight:crypt"); // skip the first-sight cut scene: these tests are about verbs
   wheel.world.setProp("goblin", "vitals.hp", 0);
   const act = (verb: string, target?: string, extra: object = {}) => {
     wheel.submit({ actor: "anna", verb, ...(target ? { target } : {}), ...extra });

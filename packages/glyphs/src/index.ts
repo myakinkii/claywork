@@ -1,4 +1,4 @@
-import type { Condition, Effect, EventDraft, Id, Ref, Trigger, World } from "@claywork/clay";
+import type { ArtRef, Condition, Effect, EventDraft, Id, Ref, Trigger, World } from "@claywork/clay";
 
 /** What a glyph can see: the world and who/what the current event is about. */
 export interface GlyphContext {
@@ -75,6 +75,7 @@ export function apply(effects: Effect[], ctx: GlyphContext): Applied {
         name: "narration",
         scope: toActor ? { kind: "actor", actor: ctx.actor! } : { kind: "room", room: room! },
         text: effect.say,
+        ...(effect.art ? { art: effect.art } : {}),
       });
     } else if ("set" in effect) {
       const [thing, path, value] = effect.set;
@@ -127,6 +128,13 @@ export function fire(
     result.blocked ||= applied.blocked;
   }
   return result;
+}
+
+/** Pick a thing's sprite for its current state: first matching variant, else the default. */
+export function pickArt(ref: ArtRef | undefined, ctx: GlyphContext): string | undefined {
+  if (ref === undefined || typeof ref === "string") return ref;
+  for (const variant of ref.when ?? []) if (check(variant.if, ctx)) return variant.use;
+  return ref.default;
 }
 
 /** Every literal id a condition or effect refers to, for validation by the kiln. */

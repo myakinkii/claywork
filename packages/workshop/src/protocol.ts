@@ -1,3 +1,4 @@
+import type { Sprite } from "@claywork/clay";
 import type { View } from "@claywork/glaze";
 
 /** Everything a client may say. */
@@ -26,10 +27,11 @@ export interface InstanceInfo {
 export type ServerMessage =
   | { type: "welcome"; token: string }
   | { type: "lobby"; worlds: WorldInfo[]; instances: InstanceInfo[] }
-  | { type: "joined"; instance: InstanceInfo; actor: string }
+  /** You are in a world. Its art library comes once, here; events refer to sprites by id. */
+  | { type: "joined"; instance: InstanceInfo; actor: string; art: Record<string, Sprite> }
   | { type: "view"; view: View; dead: boolean }
   /** Something perceived in the world, already from this player's perspective. */
-  | { type: "event"; name: string; text: string; mine: boolean; tick: number }
+  | { type: "event"; name: string; text: string; mine: boolean; tick: number; art?: string }
   /** The client talking, not the world: help, clarifications, errors in what was typed. */
   | { type: "notice"; text: string; kind: "help" | "info" | "error" }
   /** Who is in this world with you, sent whenever it changes. */

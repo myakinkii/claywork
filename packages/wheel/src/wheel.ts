@@ -4,7 +4,8 @@ import { fire, check } from "@claywork/glyphs";
 import { Slip, perspective } from "@claywork/slip";
 import { standardVerbs, type Verb } from "./verbs.ts";
 import { redescribe, worldVerb } from "./world-verbs.ts";
-import { STILL_VERBS, overhear } from "./senses.ts";
+import { STILL_VERBS, overhear, sight } from "./senses.ts";
+import { pickArt } from "@claywork/glyphs";
 
 /** How an intent turned out, for simulations and tests. */
 export type Outcome = "done" | "failed" | "unable" | "blocked";
@@ -50,6 +51,7 @@ export class Wheel {
     this.slip = new Slip((id) => (this.world.has(id) ? this.world.roomOf(id) : null), {
       memory: options.memory ?? 20,
       overhear: overhear(this.world),
+      adapt: sight(this.world),
     });
     for (const verb of options.verbs ?? standardVerbs) this.#verbs.set(verb.name, { origin: "engine", ...verb });
     for (const [name, config] of Object.entries(scenario.verbs ?? {})) {
@@ -130,6 +132,7 @@ export class Wheel {
     this.#outcomes.clear();
     const produced: GameEvent[] = [];
     for (const intent of intents) produced.push(...this.#publish(this.#resolve(intent)));
+    produced.push(...this.#publish(this.#firstSights()));
     produced.push(...this.#publish(this.#checkGoals()));
     for (const fn of [...this.#turnListeners]) fn(produced);
     return produced;
@@ -253,6 +256,34 @@ export class Wheel {
       events.push(...enter.events);
     }
     return events;
+  }
+
+  /**
+   * Cut scenes for first sights: the first time a player can see a room or a creature
+   * that has art, they get its picture. A room lit later by a torch counts as first seen then.
+   */
+  #firstSights(): EventDraft[] {
+    if (!this.scenario.art) return [];
+    const { world } = this;
+    const drafts: EventDraft[] = [];
+    for (const player of world.things.values()) {
+      if (player.traits.actor?.kind !== "player" || !world.isAlive(player.id) || !world.canSee(player.id)) continue;
+      const roomId = world.roomOf(player.id);
+      if (!roomId) continue;
+      const room = world.get(roomId);
+      const roomArt = pickArt(room.art, { world, actor: player.id, target: room.id });
+      if (roomArt && world.remember(player.id, `sight:${room.id}`)) {
+        drafts.push({ name: "beheld", scope: { kind: "actor", actor: player.id }, actor: player.id, target: room.id, text: room.traits.room?.title ?? room.name, art: roomArt });
+      }
+      for (const t of world.perceivable(player.id)) {
+        if (!t.traits.actor || t.traits.actor.kind === "player" || !world.isAlive(t.id)) continue;
+        const art = pickArt(t.art, { world, actor: player.id, target: t.id });
+        if (art && world.remember(player.id, `sight:${t.id}`)) {
+          drafts.push({ name: "beheld", scope: { kind: "actor", actor: player.id }, actor: player.id, target: t.id, text: t.description ?? t.name, art });
+        }
+      }
+    }
+    return drafts;
   }
 
   #checkGoals(): EventDraft[] {

@@ -1,4 +1,4 @@
-import type { Condition, Effect, Id, Scenario, Thing } from "@claywork/clay";
+import type { ArtRef, Condition, Effect, Id, Scenario, Sprite, Thing } from "@claywork/clay";
 import { flagsRead, references } from "@claywork/glyphs";
 import { Wheel, standardVerbs } from "@claywork/wheel";
 
@@ -158,6 +158,24 @@ export function fire(scenario: Scenario): Firing {
 
   for (const [flag, at] of flagsUsed) if (!flagsWritten.has(flag)) error("flag-never-set", `Reads flag "${flag}", which nothing ever sets.`, at);
 
+  // --- art --------------------------------------------------------------------
+  const sprites = scenario.art ?? {};
+  const usedArt = new Set<string>();
+  const useArt = (id: string, at: string) => {
+    usedArt.add(id);
+    if (!(id in sprites)) error("missing-art", `Shows sprite "${id}", which is not in the art library.`, at);
+  };
+  for (const [id, sprite] of Object.entries(sprites)) for (const c of checkSprite(sprite)) cracks.push({ ...c, at: `art:${id}` });
+  for (const t of scenario.things) {
+    if (t.art === undefined) continue;
+    for (const id of artIds(t.art)) useArt(id, t.id);
+    if (typeof t.art !== "string") for (const v of t.art.when ?? []) checkRefs(v.if, t.id);
+  }
+  for (const trig of triggers) {
+    for (const effect of [...trig.then, ...(trig.else ?? [])]) if ("say" in effect && effect.art) useArt(effect.art, `trigger:${trig.id}`);
+  }
+  for (const id of Object.keys(sprites)) if (!usedArt.has(id)) warn("unused-art", `Sprite "${id}" is never shown.`, `art:${id}`);
+
   // --- reachability (ignoring locks, counting revealable secrets) -------------
   if (isRoom(scenario.spawn)) {
     const reached = new Set<Id>([scenario.spawn]);
@@ -186,6 +204,36 @@ export function fire(scenario: Scenario): Firing {
   }
 
   return { ok: !cracks.some((c) => c.severity === "error"), cracks };
+}
+
+/** The limits keep art legible in an 80 column terminal (two pixel rows per text line). */
+export const ART_LIMITS = { width: 64, height: 64 };
+
+/** Well-formed pixel art: even rows, known colors, within the limits. */
+export function checkSprite(sprite: Sprite): Crack[] {
+  const cracks: Crack[] = [];
+  const error = (code: string, message: string) => cracks.push({ severity: "error", code, message });
+  if (!sprite.rows?.length) {
+    error("empty-art", "The sprite has no rows.");
+    return cracks;
+  }
+  const w = sprite.rows[0]!.length;
+  if (sprite.rows.some((r) => r.length !== w)) error("ragged-art", `Rows must all be ${w} characters wide; some are not.`);
+  if (w > ART_LIMITS.width || sprite.rows.length > ART_LIMITS.height) {
+    error("art-too-big", `${w}x${sprite.rows.length} is larger than ${ART_LIMITS.width}x${ART_LIMITS.height}.`);
+  }
+  for (const [key, color] of Object.entries(sprite.palette ?? {})) {
+    if (key.length !== 1 || key === ".") error("bad-palette-key", `Palette keys are single characters other than "."; "${key}" is not.`);
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) error("bad-color", `"${key}" is "${color}", which is not a #rrggbb color.`);
+  }
+  const unknown = new Set<string>();
+  for (const row of sprite.rows) for (const ch of row) if (ch !== "." && !(ch in (sprite.palette ?? {}))) unknown.add(ch);
+  if (unknown.size) error("unknown-color", `Characters with no palette color: ${[...unknown].map((c) => JSON.stringify(c)).join(", ")}.`);
+  return cracks;
+}
+
+function artIds(ref: ArtRef): string[] {
+  return typeof ref === "string" ? [ref] : [ref.default, ...(ref.when ?? []).map((v) => v.use)];
 }
 
 /**

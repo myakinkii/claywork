@@ -44,6 +44,15 @@ export function overhear(world: World): Overhear {
   };
 }
 
+/** Pictures need eyes: in the dark, or blind, you get the words without the art. */
+export function sight(world: World) {
+  return (event: GameEvent, actor: Id): GameEvent => {
+    if (!event.art || !world.has(actor) || world.canSee(actor)) return event;
+    const { art: _art, ...blind } = event;
+    return blind;
+  };
+}
+
 /** Verbs that keep an actor still: they count stillness up, and keep it listening. */
 export const STILL_VERBS = new Set(["wait", "listen"]);
 

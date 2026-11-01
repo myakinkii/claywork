@@ -1,5 +1,5 @@
 // Play a world in real time. The wheel keeps turning whether you act or not.
-// Usage: npm run play [-- worlds/some-world.json] ; env NAME=Anna TICK_MS=2500
+// Usage: npm run play [-- worlds/some-world.json] ; env NAME=Anna TICK_MS=2500 ART=ansi|plain|off
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -8,7 +8,7 @@ import { loadScenario, type Scenario } from "@claywork/clay";
 import { fire } from "@claywork/kiln";
 import { Wheel } from "@claywork/wheel";
 import { perspective } from "@claywork/slip";
-import { clarify, glaze, help, toText, understand, type MetaDoc } from "@claywork/glaze";
+import { clarify, glaze, help, toAnsi, toPlain, toText, understand, type MetaDoc } from "@claywork/glaze";
 import { awaken, type Minds } from "@claywork/golems";
 
 const path = resolve(process.argv[2] ?? "worlds/drowned-cellar.json");
@@ -46,6 +46,8 @@ const show = () => {
 };
 
 wheel.slip.subscribe((event) => {
+  const art = picture(event.art);
+  if (art) print(`\n${art}`);
   if (event.name === "looked" || (event.actor === me && event.name === "entered" && event.tick === 0)) return print(perspective(event, me));
   print(`  ${event.actor === me ? "·" : "»"} ${perspective(event, me)}`);
   if (event.actor === me && event.name === "died") {
@@ -61,7 +63,16 @@ wheel.onTurn((events) => {
   if (events.some((e) => e.actor === me && ["entered", "taken", "dropped", "opened", "unlocked", "searched"].includes(e.name)) || events.some((e) => e.name === "narration")) show();
 });
 
+// Pictures: truecolor half-blocks by default, the raw grid for terminals without color.
+let artMode = (process.env.ART ?? (process.env.NO_COLOR ? "plain" : "ansi")).toLowerCase();
+const picture = (id: string | undefined): string | null => {
+  const sprite = id ? scenario.art?.[id] : undefined;
+  if (!sprite || artMode === "off") return null;
+  return artMode === "plain" ? toPlain(sprite) : toAnsi(sprite);
+};
+
 const meta: MetaDoc[] = [
+  { usage: "/art on, /art off", summary: "Show or hide the pictures that come with some moments." },
   { usage: "/help, /?", summary: "This overview." },
   { usage: "/look", summary: "Describe where you are again (or just press Enter)." },
   { usage: "/quit", summary: "Leave the world." },
@@ -81,6 +92,12 @@ rl.on("line", (line) => {
     case "meta":
       if (cmd.name === "help" || cmd.name === "?") return print("\n" + help(wheel.verbs(), wheel.options(me), meta));
       if (cmd.name === "look") return show();
+      if (cmd.name === "art") {
+        const on = cmd.args.trim().toLowerCase();
+        if (on === "off") artMode = "off";
+        else if (on === "on") artMode = process.env.ART && process.env.ART !== "off" ? process.env.ART : "ansi";
+        return print(`  (pictures ${artMode === "off" ? "off" : "on"})`);
+      }
       if (cmd.name === "quit" || cmd.name === "q") return shutdown();
       return print(`  (unknown command /${cmd.name}, try /help)`);
     case "ambiguous":

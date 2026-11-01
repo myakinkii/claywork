@@ -1,4 +1,5 @@
 import type { EventDraft, Id, Intent, Option, Thing, World } from "@claywork/clay";
+import { pickArt } from "@claywork/glyphs";
 
 export interface VerbContext {
   world: World;
@@ -112,8 +113,9 @@ const look: Verb = {
     const text = dark
       ? (target.traits.dark?.text ?? "It is too dark to see. You could feel around for things.")
       : (target.description ?? `You see nothing special about ${the(target)}.`);
+    const art = world.canSee(actor) ? pickArt(target.art, { world, actor, target: target.id }) : undefined;
     return {
-      events: [{ name: "looked", scope: { kind: "actor", actor }, actor, target: target.id, text, you: text }],
+      events: [{ name: "looked", scope: { kind: "actor", actor }, actor, target: target.id, text, you: text, ...(art ? { art } : {}) }],
     };
   },
 };

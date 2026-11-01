@@ -128,12 +128,32 @@ Slip stays plumbing: the wheel injects the `overhear` rule, and an actor may rec
 
 Golem voices can also **mutter** (`voice(..., { mutter: { everyTicks: 4 } })`): they talk to themselves now and then, which is what makes eavesdropping worth it.
 
+## Art: moments, not decoration
+
+Worlds can carry pixel art written as text: a palette of single characters, and rows with one character per pixel (`.` is transparent). It shows up like cut scenes in old text adventures, at moments the world chooses:
+
+- **first sight** of a room or a creature, once per player (a dark room lit later by a torch counts as first seen then);
+- **looking** at something, in the variant for its current state, chosen by glyph conditions;
+- **story beats**: a glyph's `say` can carry `art`, like every clay figure turning its head toward you.
+
+```json
+"iron_chest": {
+  "art": {
+    "default": "chest_closed",
+    "when": [{ "if": { "prop": ["$target", "openable.open"], "equals": true }, "use": "chest_open" }]
+  }
+}
+```
+
+Pictures need eyes: in the dark, or blind, you get the words without the art. Events carry only a sprite id; the browser gets the world's art library once on joining and draws SVG, the terminal draws truecolor half-blocks (`ART=plain` for the raw grid, `ART=off`), and `/art on|off` works in both. The kiln fires art like everything else: even rows, known colors, at most 64x64 so it fits an 80 column terminal, and every reference resolved. `tools/art` holds the scripts that drew the Drowned Cellar.
+
 ## Next
 
 - Real adapters behind `Reflex` (a Jev / djev-run HTTP client) and `Reason` (any LLM API), keeping the fakes for tests.
 - ADK (TypeScript) agents as `Policy` / voice implementations for slow NPCs.
 - The deliberation gate: a Noul answer that wakes System Two to update a golem's goal.
 - Party semantics: respawn, shared versus personal state (`once` per world or per actor), party goals.
+- Animated sprites (a few frames: the torch flickering, the heart beating).
 - Links inside the prose: references in descriptions that become links only when perceivable.
 - Hearing in the dark (sounds of events you can't see), smell, and verbs that change light (`light`, `extinguish`).
 - JSON Schema for scenarios, then the potter.
