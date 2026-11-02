@@ -33,3 +33,11 @@ test("a broken setup is reported, not silently passed", async () => {
   assert.equal(r.pass, false);
   assert.match(r.error!, /was failed/, "Max can't reach the Warden from the antechamber");
 });
+
+test("the cellar's goblin fires its tiles with the offline fake", async () => {
+  const scenario = loadScenario(world("drowned-cellar.json"));
+  const file = loadTiles(world("drowned-cellar.tiles.json"));
+  const minds = (await import("../../../worlds/drowned-cellar.minds.ts")).default();
+  const results = await Promise.all(file.tiles.map((t) => fireTile(scenario, file, t, minds.reflex!)));
+  for (const r of results) assert.ok(r.pass, `${r.tile.id}: ${r.error ?? `got ${r.choice} at ${r.confidence}`}`);
+});

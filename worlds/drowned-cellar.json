@@ -103,11 +103,7 @@
       "description": "A wiry goblin with a chipped dagger, standing guard in front of the iron door.",
       "art": "goblin",
       "traits": {
-        "actor": {
-          "kind": "mob",
-          "persona": "A cowardly but greedy goblin. Fights when cornered, flees when badly hurt.",
-          "goal": "Guard the iron door. Attack intruders who come close."
-        },
+        "actor": { "kind": "mob", "archetype": "goblin" },
         "vitals": { "hp": 8, "maxHp": 8 }
       }
     },
@@ -478,6 +474,22 @@
         "........................",
         "........................"
       ]
+    }
+  },
+  "archetypes": {
+    "goblin": {
+      "persona": "A cowardly but greedy goblin.",
+      "phases": [
+        {
+          "id": "guarding",
+          "goal": "Run away when you are badly hurt. Attack your foe when your foe is badly hurt. Attack your foe when you are trapped."
+        }
+      ],
+      "repertoire": ["attack", "go", "wait"],
+      "calm": {
+        "goal": "You guard the iron door, alone in the dark water. You speak of yourself as \"Goblin\", in short, broken sentences. On your mind, and what you mutter about when you think nobody is listening: the rusty key you hid in the heavy iron chest, where nobody ever looks; that Goblin is NOT scared (Goblin is); the warm clay heart behind the iron door, which eats the voice of whoever takes it, the master said; and that when someone hits hard, Goblin always runs, and then comes back. Goblin loves shiny things.",
+        "mutterEvery": 4
+      }
     }
   },
   "verbs": {

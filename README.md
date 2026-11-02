@@ -126,7 +126,7 @@ Perception is not all-or-nothing:
 
 Slip stays plumbing: the wheel injects the `overhear` rule, and an actor may receive a transformed event instead of the original. Overheard events are re-scoped to the listener and never carry an actor, so nobody is told "You say..." about something heard through a wall.
 
-Golem voices can also **mutter** (`voice(..., { mutter: { everyTicks: 4 } })`): they talk to themselves now and then, which is what makes eavesdropping worth it.
+Golems can **mutter**: an archetype's `calm.mutterEvery` gives the creature a quiet moment every few ticks with nothing new, and its calm mind may talk to itself, which is what makes eavesdropping worth it. A golem's calm mind wakes when a player can perceive it, including through a wall that echoes its room. The Drowned Cellar's goblin keeps its secrets in its archetype (the key in the chest, the heart that eats your voice), so a real model mutters fresh lines about them, and each calm thought sees its own last words (`you_recently`) so it doesn't repeat itself.
 
 ## Real minds
 
@@ -136,7 +136,7 @@ For reflexes, `SystemOneHttp` speaks the TypeSafe System One protocol (`POST ...
 
 ```bash
 cp .env.example .env   # set REFLEX_URL and your key (DASHSCOPE_API_KEY works); .env is git-ignored
-npm run probe          # what would the goblin do? Shows the state sent, every option with its probability, timing and tokens
+npm run tiles -- worlds/drowned-cellar.json   # what does the goblin do? Each tile shows the choice and its probabilities; SHOW=1 the state sent
 DEBUG=golems npm start # play, and watch each decision: choice, confidence, danger, latency, tokens
 ```
 
@@ -164,6 +164,7 @@ Like the battle mode of a CRPG, a creature's mind switches with the situation, a
 
 ```bash
 npm run probe:calm     # Pebble's calm mind in six situations (REASON_URL for the real chat model)
+npm run probe:calm -- worlds/drowned-cellar.json   # the goblin, alone, muttering four times
 PROMPT=1 SHOW=1 npm run probe:calm
 ```
 
@@ -203,9 +204,7 @@ Pictures need eyes: in the dark, or blind, you get the words without the art. Ev
 
 ## Next
 
-- Give the Drowned Cellar's goblin an archetype and tiles; it still uses the older per-option `reflexPolicy`.
 - Calm actions, starting with fetch: let the calm mind choose real legal moves too (`sit`, `fetch the sword`), validated like everything else.
-- Voices for the Drowned Cellar's goblin through the calm mind, replacing its scripted `FakeReason` lines.
 - System Two steering: a language model that rewrites a golem's goal or phase mid-game, which the fast System One loop then follows.
 - ADK (TypeScript) agents as `Policy` / voice implementations for slow NPCs.
 - Spawning adds mid-fight (a `spawn` effect with creature templates); `awaken` already animates golems that appear later.

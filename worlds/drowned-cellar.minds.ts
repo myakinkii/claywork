@@ -1,20 +1,27 @@
-// Minds for the Drowned Cellar. With REFLEX_URL set (see .env.example) the goblin decides
-// with a real System One model; otherwise it uses a fake with scripted instincts, so tests
-// and offline play keep working. The voice is still scripted until a Reason adapter lands.
+// Minds for the Drowned Cellar. The goblin thinks with its archetype: in a fight with the
+// System One decision model (REFLEX_URL), and alone with a chat model (REASON_URL) that
+// mutters its secrets for anyone listening through the wall. Without them, fakes stand in,
+// so tests and offline play keep working.
 import { FakeReflex, reflexFromEnv, type FakeRule } from "@claywork/reflex";
-import { FakeReason } from "@claywork/reason";
-import { MUTTER, type Minds } from "@claywork/golems";
+import { FakeReason, reasonFromEnv } from "@claywork/reason";
+import type { Minds } from "@claywork/golems";
 
-/** Fake instincts: fight while healthy, flee when badly hurt. A real model gets the persona instead. */
-const instincts: FakeRule = ({ key, question, state }) => {
-  if (key !== "action" || question.type !== "choice") return undefined;
-  const self = (state as { self: { state: string[] } }).self;
-  const hp = Number(self.state.find((s) => s.startsWith("hp "))?.slice(3).split("/")[0] ?? 99);
-  const prefer = hp <= 3 ? "go:" : "attack:";
-  return Object.fromEntries(Object.keys(question.criteria).map((id) => [id, id.startsWith(prefer) ? 3 : 0]));
+/**
+ * Fake instincts, reading the goblin's mind view as the real model would: run when the
+ * "You are badly hurt!" alert is up and a way out exists, otherwise attack. A real model
+ * gets the archetype's goal instead.
+ */
+const instincts: FakeRule = ({ question, state }) => {
+  if (question.type !== "choice") return undefined;
+  const alerts = (state as { alerts?: string[] }).alerts ?? [];
+  const ids = Object.keys(question.criteria);
+  const run = ids.find((id) => id.startsWith("go:"));
+  const attack = ids.find((id) => id.startsWith("attack:"));
+  const pick = alerts.includes("You are badly hurt!") && run ? run : (attack ?? "wait");
+  return Object.fromEntries(ids.map((id) => [id, id === pick ? 3 : 0]));
 };
 
-const replies = ["Mine! Go away!", "Shiny things... you have shiny things?", "Door stays shut. Goblin says so."];
+/** The secrets a real model finds in the archetype's calm goal, as a fake's four lines. */
 const mutters = [
   "Nobody looks in the chest. Chest is heavy. Key is safe, hehe.",
   "Goblin is not scared. Goblin is NOT scared.",
@@ -24,16 +31,15 @@ const mutters = [
 
 /** Fresh minds per instance, so every party's goblin keeps its own memory. */
 export default function minds(): Minds {
-  let replied = 0;
-  let muttered = 0;
   const real = reflexFromEnv();
+  let muttered = 0;
+  const fakeVoice = new FakeReason(
+    (req) => (req.system?.includes("mutter to yourself") ? JSON.stringify({ do: "say", text: mutters[muttered++ % mutters.length] }) : '{"do": "nothing"}'),
+    { latencyMs: 300 },
+  );
   return {
     reflex: real ?? new FakeReflex({ latencyMs: [60, 300], rules: [instincts] }),
-    reason: new FakeReason(
-      (req) => (req.messages.at(-1)?.content === MUTTER ? mutters[muttered++ % mutters.length]! : replies[replied++ % replies.length]!),
-      { latencyMs: 400 },
-    ),
-    mutterEvery: 4,
+    reason: reasonFromEnv() ?? fakeVoice,
     // A real model is a network call away: give it more room than the fake needs.
     deadlineMs: Number(process.env.REFLEX_DEADLINE_MS ?? (real ? 1500 : 800)),
   };

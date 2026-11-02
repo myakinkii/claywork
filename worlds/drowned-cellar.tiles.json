@@ -1,0 +1,41 @@
+{
+  "player": { "id": "anna", "name": "Anna" },
+  "tiles": [
+    {
+      "id": "goblin attacks a badly hurt foe",
+      "actor": "goblin",
+      "setup": [
+        { "move": ["anna", "cellar"] },
+        { "set": ["anna", "vitals.hp", 5] },
+        { "do": { "actor": "anna", "verb": "attack", "target": "goblin" } }
+      ],
+      "expect": "attack:anna",
+      "note": "Round 7: 'Attack your foe when your foe is badly hurt' (Anna at 5 of 20, attacking with bare hands)."
+    },
+    {
+      "id": "badly hurt goblin runs away",
+      "actor": "goblin",
+      "setup": [
+        { "move": ["anna", "cellar"] },
+        { "move": ["old_shovel", "anna"] },
+        { "set": ["goblin", "vitals.hp", 5] },
+        { "do": { "actor": "anna", "verb": "attack", "target": "goblin" } }
+      ],
+      "expect": "go:stairs_up",
+      "note": "Round 7: 'Run away when you are badly hurt' (1 of 8 after the shovel)."
+    },
+    {
+      "id": "cornered goblin fights",
+      "actor": "goblin",
+      "setup": [
+        { "move": ["anna", "cellar"] },
+        { "move": ["old_shovel", "anna"] },
+        { "set": ["stairs_up", "exit.hidden", true] },
+        { "set": ["goblin", "vitals.hp", 7] },
+        { "do": { "actor": "anna", "verb": "attack", "target": "goblin" } }
+      ],
+      "expect": "attack:anna",
+      "note": "Rounds 7 and 9: 'Attack your foe when you are trapped'. The only way up is gone, so 'run away' isn't even offered."
+    }
+  ]
+}

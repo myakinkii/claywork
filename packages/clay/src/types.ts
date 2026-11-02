@@ -216,7 +216,11 @@ export interface Archetype {
    * instead of the fast decision model choosing moves. Without it, the creature is always
    * in battle mode. Battle: a living foe in reach, or an attack it noticed in the last ticks.
    */
-  calm?: { goal: string };
+  calm?: {
+    goal: string;
+    /** With nothing new for this many ticks, it gets a moment alone: muttering to itself, for anyone listening. */
+    mutterEvery?: number;
+  };
 }
 
 // ---------------------------------------------------------------------------

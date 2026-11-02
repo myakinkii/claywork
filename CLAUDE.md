@@ -14,11 +14,12 @@ npm run typecheck   # tsc, no emit
 npm run kiln        # validate worlds/drowned-cellar.json (structure, art, walkthrough)
 npm run play        # terminal client, real time
 npm start           # world server + browser client, http://localhost:8080
-npm run probe       # ask the configured System One model what the goblin would do
+npm run tiles       # fire a world's test tiles against its minds (default: the arena; real model with REFLEX_URL)
+npm run probe:calm  # a creature's calm (slow) mind in a few situations
 DEBUG=all npm start # or DEBUG=net,events,intents,golems
 ```
 
-`npm start`, `play` and `probe` load `.env` (git-ignored; see `.env.example`). Before
+`npm start`, `play`, `tiles` and `probe:calm` load `.env` (git-ignored; see `.env.example`). Before
 committing: `npm run typecheck && npm test && npm run kiln`.
 
 ## Runtime and TypeScript rules
@@ -48,7 +49,7 @@ committing: `npm run typecheck && npm test && npm run kiln`.
 | `golems` | NPC minds: `Policy`, `brute`, `animate` (deadline, fallback, dormancy), `voice`, `awaken`. `mind.ts`: archetype minds, the main path: roles, role-framed perception (`frame`, `describe`), attention (`noticed`, `attentive`), standing `orders`, `mindView` (the exact state and choices sent), `mindPolicy`, `restricted`, battle/calm `modeOf`, and `calmThink` (the slow mind: validated `expression`s only). `reflexPolicy` is the older per-option path for golems without an archetype. |
 | `workshop` | Server-side, transport-agnostic: shelf of fired worlds, `Instance` (wheel + golems), `Session` (survives disconnects: link-dead), protocol types, `createDebug`. |
 | `apps/server` | `ws` websocket adapter + `public/index.html` (single-file browser client). |
-| `apps/terminal` | `play.ts`, `kiln.ts`, `probe.ts`, `calm-probe.ts`, `tiles.ts` (+ `tiles-lib.ts`: fire a world's test tiles). |
+| `apps/terminal` | `play.ts`, `kiln.ts`, `calm-probe.ts`, `tiles.ts` (+ `tiles-lib.ts`: fire a world's test tiles). |
 | `worlds/` | `<id>.json` scenarios, optional `<id>.minds.ts` (fresh `Minds` per instance), optional `<id>.tiles.json` (test tiles). |
 | `tools/art/` | Python + Pillow scripts that drew the sprites; seeded, reproducible. |
 

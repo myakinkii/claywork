@@ -13,7 +13,6 @@
     "kiln": "node apps/terminal/src/kiln.ts",
     "play": "node --env-file-if-exists=.env apps/terminal/src/play.ts",
     "start": "node --env-file-if-exists=.env apps/server/src/main.ts",
-    "probe": "node --env-file-if-exists=.env apps/terminal/src/probe.ts",
     "tiles": "node --env-file-if-exists=.env apps/terminal/src/tiles.ts",
     "probe:calm": "node --env-file-if-exists=.env apps/terminal/src/calm-probe.ts"
   },

@@ -1,5 +1,5 @@
 import type { DecisionPoint, GameEvent, Id, Option, Thing } from "@claywork/clay";
-import { attentive, calmThink, mindPolicy, modeOf, orders, restricted, type MindOptions } from "./mind.ts";
+import { attentive, calmThink, currentPhase, mindPolicy, modeOf, orders, restricted, type MindOptions } from "./mind.ts";
 import { Choice, Noul, Score, getChoice, getNoul, getScore, type Reflex } from "@claywork/reflex";
 import type { Reason } from "@claywork/reason";
 import type { Wheel } from "@claywork/wheel";
@@ -207,13 +207,17 @@ export function voice(wheel: Wheel, actor: Id, reason: Reason, options: VoiceOpt
     if (remember) history.push(prompt);
     const me = wheel.world.get(actor);
     const traits = me.traits.actor;
+    // an archetype, when there is one, holds the persona and the current goal
+    const archetype = traits?.archetype ? wheel.scenario.archetypes?.[traits.archetype] : undefined;
+    const persona = traits?.persona ?? archetype?.persona;
+    const goal = traits?.goal ?? (archetype ? currentPhase(wheel.world, actor, archetype).goal : undefined);
     try {
       const obs = wheel.observe(actor);
       const res = await reason.complete({
         system: [
           `You are ${me.name} in a text adventure. ${me.description ?? ""}`,
-          traits?.persona ? `Persona: ${traits.persona}` : "",
-          traits?.goal ? `Goal: ${traits.goal}` : "",
+          persona ? `Persona: ${persona}` : "",
+          goal ? `Goal: ${goal}` : "",
           `You are in: ${obs.room.title}. You see: ${obs.visible.map((v) => v.name).join(", ") || "nothing"}.`,
           "Reply with one short line of speech only, in character. No narration, no quotes.",
         ].filter(Boolean).join("\n"),
@@ -263,6 +267,21 @@ export interface Minds {
   deadlineMs?: number;
   /** How long a calm (slow) thought may take, in ms. Default 8000: calm moments can wait. */
   calmDeadlineMs?: number;
+}
+
+/**
+ * True when a living, connected player can perceive the actor: in its room, or in a room that
+ * echoes it (listening through a wall). Someone to express itself for.
+ */
+export function playerPerceives(wheel: Wheel, actor: Id): boolean {
+  const room = wheel.world.roomOf(actor);
+  if (!room) return false;
+  for (const t of wheel.world.things.values()) {
+    if (t.traits.actor?.kind !== "player" || t.traits.linkdead || !wheel.world.isAlive(t.id)) continue;
+    const where = wheel.world.roomOf(t.id);
+    if (where === room || (where && wheel.world.get(where).traits.echo?.from === room)) return true;
+  }
+  return false;
 }
 
 /** True when a living player shares the actor's room: someone to act for. */
@@ -323,21 +342,29 @@ export function awaken(wheel: Wheel, minds: Minds = {}, options: Pick<AnimateOpt
       if (archetype.calm && minds.reason) {
         const reason = minds.reason;
         let busy = false;
+        let lastCalm = wheel.tick;
+        const mutterEvery = archetype.calm.mutterEvery;
         unCalm = wheel.onTurn(() => {
-          if (busy || inBattle() || !playerNearby(wheel, thing.id) || !attention.wants()) return;
+          if (busy || inBattle() || !playerPerceives(wheel, thing.id)) return;
+          // something it attends to happened, or, failing that, a quiet moment to mutter
+          const news = attention.wants();
+          const idle = !news && mutterEvery !== undefined && wheel.tick - lastCalm >= mutterEvery;
+          if (!news && !idle) return;
           busy = true;
+          lastCalm = wheel.tick;
           attention.thought();
           const tick = wheel.tick;
           const started = Date.now();
           const heardNow = heard.current();
           const where = wheel.world.roomOf(thing.id) ?? undefined;
-          calmThink(wheel, thing.id, archetype, reason, { signal: AbortSignal.timeout(minds.calmDeadlineMs ?? 8000), ...(heardNow ? { heard: heardNow } : {}) })
+          calmThink(wheel, thing.id, archetype, reason, { signal: AbortSignal.timeout(minds.calmDeadlineMs ?? 8000), idle, ...(heardNow ? { heard: heardNow } : {}) })
             .then(({ expression }) => {
               // the world may have turned to battle while it thought: then the moment has passed
               if (expression && !inBattle() && wheel.world.isAlive(thing.id)) {
                 wheel.submit({ actor: thing.id, verb: expression.verb, text: expression.text, ...(where ? { where } : {}) });
               }
-              options.onDecision?.({ option: expression?.verb ?? "nothing", why: expression ? `calm: ${expression.text}` : "calm: nothing", actor: thing.id, tick, source: reason.name, ms: Date.now() - started });
+              const how = idle ? "muttering" : "calm";
+              options.onDecision?.({ option: expression?.verb ?? "nothing", why: expression ? `${how}: ${expression.text}` : `${how}: nothing`, actor: thing.id, tick, source: reason.name, ms: Date.now() - started });
             })
             .catch((e: Error) => options.onDecision?.({ option: "nothing", why: `calm failed: ${e.message}`, actor: thing.id, tick, source: reason.name, ms: Date.now() - started }))
             .finally(() => (busy = false));

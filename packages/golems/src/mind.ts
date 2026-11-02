@@ -250,9 +250,9 @@ export function mindView(wheel: Wheel, self: Id, archetype: Archetype, dp: Decis
     if (!world.isAlive(m)) alerts.push("Your master is dead!");
     else if (mv && healthWord(mv.hp, mv.maxHp) === "badly hurt") alerts.push("Your master is badly hurt!");
   }
-  if (archetype.repertoire.includes("go") && !dp.options.some((o) => o.intent.verb === "go")) {
-    alerts.push("You are trapped: there is nowhere to run!");
-  }
+  // "trapped" as an alert AND a fact: round 9 measured 0.32 -> 0.57 for the cornered goblin
+  const trapped = archetype.repertoire.includes("go") && !dp.options.some((o) => o.intent.verb === "go");
+  if (trapped) alerts.push("You are trapped: there is nowhere to run!");
 
   const memory = archetype.memory ?? 4;
   const lines = noticed(world, self, wheel.slip.recent(self, 20), archetype).slice(-memory).map((n) => n.line);
@@ -260,7 +260,7 @@ export function mindView(wheel: Wheel, self: Id, archetype: Archetype, dp: Decis
   const state: Record<string, unknown> = {
     persona: archetype.persona,
     goal: phase.goal,
-    you: conditionOf(world, self, self),
+    you: `${conditionOf(world, self, self)}${trapped ? " You are trapped: there is no way out." : ""}`,
     ...(m ? { master: conditionOf(world, self, m) } : {}),
     ...(foes.length ? { foes: foes.map((f) => conditionOf(world, self, f.id)) } : {}),
     ...(allies.length ? { allies: allies.map((a) => conditionOf(world, self, a.id)) } : {}),
@@ -298,11 +298,12 @@ const CALM_FORMAT = [
 ].join("\n");
 
 /** The slow mind's instructions: persona, calm goal, and the one thing it may do: express itself. */
-export function calmSystem(world: World, self: Id, archetype: Archetype): string {
+export function calmSystem(world: World, self: Id, archetype: Archetype, options: { idle?: boolean } = {}): string {
   return [
     `You are ${the(world.get(self))}, a creature in a text adventure.`,
     `Persona: ${archetype.persona}`,
     `There is no danger right now. ${archetype.calm!.goal}`,
+    ...(options.idle ? ["Nothing new has happened for a while and nobody is paying attention to you: you may mutter to yourself about what is on your mind."] : []),
     "You only express yourself here: never claim to attack, take, open or move anything.",
     "Keep it to one short sentence, in character. Often the best answer is a small gesture.",
     CALM_FORMAT,
@@ -346,14 +347,21 @@ export async function calmThink(
   self: Id,
   archetype: Archetype,
   reason: Reason,
-  options: { signal?: AbortSignal; heard?: string } = {},
+  options: { signal?: AbortSignal; heard?: string; idle?: boolean } = {},
 ): Promise<{ expression: Expression; raw: string; state: Record<string, unknown> }> {
   const dp = wheel.decisionPoint(self);
   const view = mindView(wheel, self, archetype, dp, options.heard ? { heard: options.heard } : {});
-  const state = { ...view.state, goal: archetype.calm!.goal };
-  delete (state as { alerts?: unknown }).alerts;
+  const state: Record<string, unknown> = { ...view.state, goal: archetype.calm!.goal };
+  delete state.alerts;
+  // its own last expressions, so it doesn't repeat itself (they never wake it: see attentive)
+  const recently = wheel.slip
+    .recent(self, 20)
+    .filter((e) => e.actor === self && (e.name === "emoted" || e.name === "said"))
+    .slice(-2)
+    .map((e) => e.text);
+  if (recently.length) state.you_recently = recently;
   const res = await reason.complete(
-    { system: calmSystem(wheel.world, self, archetype), messages: [{ role: "user", content: JSON.stringify(state) }], maxTokens: 120 },
+    { system: calmSystem(wheel.world, self, archetype, { idle: options.idle ?? false }), messages: [{ role: "user", content: JSON.stringify(state) }], maxTokens: 120 },
     options.signal ? { signal: options.signal } : {},
   );
   return { expression: expression(res.text, wheel.world.get(self).name), raw: res.text, state };

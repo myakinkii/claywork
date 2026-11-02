@@ -110,3 +110,58 @@ test("awakened golems sleep until a player is in the room: no model calls for no
   assert.equal(reflex.calls, before, "a link-dead body is no reason to think");
   for (const h of handles) h.stop();
 });
+
+// --- step 2: the goblin's calm voice and the eavesdropping puzzle ------------------------------
+
+import { awaken, calmThink, mindView, playerPerceives } from "@claywork/golems";
+
+const cellar = () => new Wheel(loadScenario(new URL("../../../worlds/drowned-cellar.json", import.meta.url)));
+
+test("a player perceives a golem in its room, or through a wall that echoes it", () => {
+  const wheel = cellar();
+  wheel.join({ id: "anna", name: "Anna" });
+  assert.equal(playerPerceives(wheel, "goblin"), false, "from the dark stairwell, nothing");
+  wheel.world.move("anna", "niche");
+  assert.equal(playerPerceives(wheel, "goblin"), true, "the niche echoes the cellar");
+  wheel.world.move("anna", "cellar");
+  assert.equal(playerPerceives(wheel, "goblin"), true);
+});
+
+test("the goblin mutters its secrets when alone, and only when someone can hear", async () => {
+  const wheel = cellar();
+  wheel.join({ id: "anna", name: "Anna" });
+  const reason = new FakeReason((req) => (req.system?.includes("mutter to yourself") ? '{"do": "say", "text": "Nobody looks in the chest."}' : '{"do": "nothing"}'));
+  const handles = awaken(wheel, { reflex: new FakeReflex(), reason });
+  await turns(wheel, 6);
+  assert.equal(reason.requests.length, 0, "Anna is upstairs: nobody to mutter for");
+
+  wheel.world.move("anna", "niche");
+  wheel.submit({ actor: "anna", verb: "listen" });
+  await turns(wheel, 7, 10);
+  for (const h of handles) h.stop();
+  assert.ok(reason.requests.length >= 1);
+  assert.match(reason.requests[0]!.system!, /rusty key you hid in the heavy iron chest/, "its secrets live in the archetype now");
+  const overheard = wheel.slip.recent("anna", 20).filter((e) => e.name === "overheard").map((e) => e.text);
+  assert.ok(overheard.includes('Through the wall, a voice: "Nobody looks in the chest."'), JSON.stringify(overheard));
+});
+
+test("a calm mind knows what it just said, so it can vary", async () => {
+  const wheel = cellar();
+  wheel.join({ id: "anna", name: "Anna" });
+  wheel.world.move("anna", "niche");
+  const archetype = wheel.scenario.archetypes!.goblin!;
+  wheel.submit({ actor: "goblin", verb: "say", text: "Goblin is not scared." });
+  wheel.turn();
+  const r = await calmThink(wheel, "goblin", archetype, new FakeReason(['{"do": "nothing"}']), { idle: true });
+  assert.deepEqual(r.state.you_recently, ['The goblin says: "Goblin is not scared."']);
+});
+
+test("trapped is a fact in the golem's own sentence, as well as an alert", () => {
+  const wheel = cellar();
+  wheel.join({ id: "anna", name: "Anna" });
+  wheel.world.move("anna", "cellar");
+  wheel.world.setProp("stairs_up", "exit.hidden", true);
+  const view = mindView(wheel, "goblin", wheel.scenario.archetypes!.goblin!, wheel.decisionPoint("goblin"));
+  assert.match(String(view.state.you), /You are trapped: there is no way out\.$/);
+  assert.ok((view.state.alerts as string[]).includes("You are trapped: there is nowhere to run!"));
+});
