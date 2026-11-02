@@ -97,7 +97,8 @@ export function reflexPolicy(reflex: Reflex, options: { fallback?: Policy; thres
       );
       const action = getChoice(res, "action");
       const danger = getScore(res, "danger").score;
-      const signals = { confidence: action.confidence, danger, deliberate: getNoul(res, "deliberate").noul };
+      const signals: Record<string, number> = { confidence: action.confidence, danger, deliberate: getNoul(res, "deliberate").noul };
+      if (res.inputTokens !== undefined) signals.tokens = res.inputTokens;
 
       if (action.confidence < t.trust) {
         const flee = danger >= t.panic ? find(dp, "go") : undefined;
@@ -126,6 +127,8 @@ export interface AnimateOptions {
   deadlineMs?: number;
   /** Called with every decision, for logs and dashboards. */
   onDecision?: (d: Decision & { actor: Id; tick: number; source: string; ms: number }) => void;
+  /** When this says false, the golem doesn't think at all this tick: no model call, no intent. */
+  awake?: () => boolean;
 }
 
 /**
@@ -141,6 +144,7 @@ export function animate(wheel: Wheel, actor: Id, options: AnimateOptions): Anima
 
   const think = async () => {
     if (thinking || !wheel.world.has(actor) || !wheel.world.isAlive(actor)) return;
+    if (options.awake && !options.awake()) return;
     thinking = true;
     const started = Date.now();
     const tick = wheel.tick;
@@ -258,9 +262,20 @@ export interface Minds {
   deadlineMs?: number;
 }
 
+/** True when a living player shares the actor's room: someone to act for. */
+export function playerNearby(wheel: Wheel, actor: Id): boolean {
+  const room = wheel.world.roomOf(actor);
+  if (!room) return false;
+  for (const t of wheel.world.things.values()) {
+    if (t.traits.actor?.kind === "player" && !t.traits.linkdead && wheel.world.isAlive(t.id) && wheel.world.roomOf(t.id) === room) return true;
+  }
+  return false;
+}
+
 /**
  * Bring every mob and npc in a world to life: a reflex policy (or the brute when there is
  * no reflex model) with the brute as fallback, and a voice when there is a reason model.
+ * Golems are dormant (no model calls at all) unless a player is in the room with them.
  * Returns handles so the caller can stop them all.
  */
 export function awaken(wheel: Wheel, minds: Minds = {}, options: Pick<AnimateOptions, "onDecision"> = {}): Animated[] {
@@ -269,7 +284,15 @@ export function awaken(wheel: Wheel, minds: Minds = {}, options: Pick<AnimateOpt
     const kind = thing.traits.actor?.kind;
     if (kind !== "mob" && kind !== "npc") continue;
     const policy = minds.reflex ? reflexPolicy(minds.reflex, { fallback: brute() }) : brute();
-    handles.push(animate(wheel, thing.id, { policy, fallback: brute(), deadlineMs: minds.deadlineMs ?? 800, ...(options.onDecision ? { onDecision: options.onDecision } : {}) }));
+    handles.push(
+      animate(wheel, thing.id, {
+        policy,
+        fallback: brute(),
+        deadlineMs: minds.deadlineMs ?? 800,
+        awake: () => playerNearby(wheel, thing.id),
+        ...(options.onDecision ? { onDecision: options.onDecision } : {}),
+      }),
+    );
     if (minds.reason) {
       handles.push(voice(wheel, thing.id, minds.reason, minds.mutterEvery ? { mutter: { everyTicks: minds.mutterEvery } } : {}));
     }

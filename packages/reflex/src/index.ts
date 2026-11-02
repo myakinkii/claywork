@@ -65,6 +65,10 @@ export type Answer = ChoiceAnswer | ScoreAnswer | NoulAnswer;
 export interface ReflexResponse {
   answers: Record<string, Answer>;
   latencyMs: number;
+  /** The provider's id for this request, for tracing a strange answer. */
+  requestId?: string;
+  /** Input tokens billed: the observation is what costs. */
+  inputTokens?: number;
 }
 
 export interface Reflex {
@@ -240,3 +244,5 @@ function overlap(a: Set<string>, b: Set<string>): number {
   for (const w of b) if (a.has(w)) n += 1;
   return b.size ? n / Math.sqrt(b.size) : 0;
 }
+
+export { SystemOneHttp, SystemOneError, reflexFromEnv, type SystemOneOptions } from "./http.ts";

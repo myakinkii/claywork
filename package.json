@@ -11,8 +11,9 @@
     "test": "node --test \"packages/*/test/*.test.ts\" \"apps/*/test/*.test.ts\"",
     "typecheck": "tsc -p .",
     "kiln": "node apps/terminal/src/kiln.ts",
-    "play": "node apps/terminal/src/play.ts",
-    "start": "node apps/server/src/main.ts"
+    "play": "node --env-file-if-exists=.env apps/terminal/src/play.ts",
+    "start": "node --env-file-if-exists=.env apps/server/src/main.ts",
+    "probe": "node --env-file-if-exists=.env apps/terminal/src/probe.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

@@ -128,6 +128,20 @@ Slip stays plumbing: the wheel injects the `overhear` rule, and an actor may rec
 
 Golem voices can also **mutter** (`voice(..., { mutter: { everyTicks: 4 } })`): they talk to themselves now and then, which is what makes eavesdropping worth it.
 
+## Real minds
+
+Golems think through two model-agnostic interfaces: `Reflex` (System One: typed Choice / Score / Noul questions answered with probabilities, no text) and `Reason` (language models). Fakes stand in for both, so everything runs and tests offline.
+
+For reflexes, `SystemOneHttp` speaks the TypeSafe System One protocol (`POST .../v1/systemone`), which Alibaba Cloud Model Studio's `decision-model-preview`, Jev, and djev-run serving DiffusionGemma all implement. Switching providers is configuration:
+
+```bash
+cp .env.example .env   # set REFLEX_URL and your key (DASHSCOPE_API_KEY works); .env is git-ignored
+npm run probe          # what would the goblin do? Shows the state sent, every option with its probability, timing and tokens
+DEBUG=golems npm start # play, and watch each decision: choice, confidence, danger, latency, tokens
+```
+
+A world's minds file chooses: `drowned-cellar.minds.ts` uses the real model when `REFLEX_URL` is set, and the scripted fake otherwise. With a real model the goblin gets no scripted instincts, only its persona and goal, so whether it flees when badly hurt is now up to the model. Golems are dormant (no calls at all) unless a living, connected player shares their room, and a slow or unsure answer still falls back to rules.
+
 ## Art: moments, not decoration
 
 Worlds can carry pixel art written as text: a palette of single characters, and rows with one character per pixel (`.` is transparent). It shows up like cut scenes in old text adventures, at moments the world chooses:
@@ -149,7 +163,8 @@ Pictures need eyes: in the dark, or blind, you get the words without the art. Ev
 
 ## Next
 
-- Real adapters behind `Reflex` (a Jev / djev-run HTTP client) and `Reason` (any LLM API), keeping the fakes for tests.
+- A `Reason` adapter (Gemini, or Qwen through an OpenAI-compatible endpoint) so voices really answer.
+- Per-golem repertoires: a goblin probably shouldn't weigh "listen" and "look at torch" in a fight.
 - ADK (TypeScript) agents as `Policy` / voice implementations for slow NPCs.
 - The deliberation gate: a Noul answer that wakes System Two to update a golem's goal.
 - Party semantics: respawn, shared versus personal state (`once` per world or per actor), party goals.

@@ -92,3 +92,21 @@ test("a voice can mutter on its own, for whoever is listening", async () => {
   assert.match(said[0]!.text, /Nobody looks in the chest/);
   assert.ok(reason.requests.every((r) => !r.messages.some((m) => m.content === MUTTER && r.messages.indexOf(m) < r.messages.length - 1)), "mutter prompts are not remembered as conversation");
 });
+
+test("awakened golems sleep until a player is in the room: no model calls for nobody", async () => {
+  const { awaken } = await import("@claywork/golems");
+  const wheel = new Wheel(loadScenario(new URL("../../../worlds/drowned-cellar.json", import.meta.url)));
+  const reflex = new FakeReflex();
+  const handles = awaken(wheel, { reflex });
+  wheel.join({ id: "anna", name: "Anna" });
+  await turns(wheel, 3);
+  assert.equal(reflex.calls, 0, "Anna is upstairs: the goblin doesn't think");
+  wheel.submit({ actor: "anna", verb: "go", target: "stairs_down" });
+  await turns(wheel, 3);
+  assert.ok(reflex.calls >= 1, "she came down: now it does");
+  wheel.world.grant("anna", "linkdead");
+  const before = reflex.calls;
+  await turns(wheel, 3);
+  assert.equal(reflex.calls, before, "a link-dead body is no reason to think");
+  for (const h of handles) h.stop();
+});
