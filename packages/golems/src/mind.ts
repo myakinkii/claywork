@@ -3,6 +3,7 @@ import { check } from "@claywork/glyphs";
 import { perspective } from "@claywork/slip";
 import { the, weaponOf, type Wheel } from "@claywork/wheel";
 import { Choice, getChoice, type Reflex } from "@claywork/reflex";
+import { parseJson, type Reason } from "@claywork/reason";
 import type { Decision, Policy } from "./index.ts";
 
 /**
@@ -111,8 +112,19 @@ export function frame(world: World, observer: Id, e: GameEvent): string {
       const s = who(e.actor);
       return sentence(`${s} ${verb(s, "leave")}.`);
     }
-    default:
+    case "emoted": {
+      // free text can't be conjugated: always third person, with the actor described by role
+      const name = e.actor === observer ? cap(the(world.get(observer))) : cap(who(e.actor));
+      return sentence(`${name} ${String(e.data?.words ?? "")}.`);
+    }
+    default: {
+      // a world verb keeps its template ("{Actor} pets {target}."): fill it in roles
+      const template = typeof e.data?.template === "string" ? e.data.template : undefined;
+      if (template) {
+        return sentence(template.replace(/\{(actor|Actor|target|Target)\}/g, (_m, key: string) => who(key.toLowerCase() === "actor" ? e.actor : e.target)));
+      }
       return perspective(e, observer);
+    }
   }
 }
 
@@ -259,6 +271,94 @@ export function mindView(wheel: Wheel, self: Id, archetype: Archetype, dp: Decis
   return { phase: phase.id, state, criteria, options };
 }
 
+// --- modes: battle (fast mind, moves) and calm (slow mind, expression) -------------------------
+
+/** How many ticks an attack stays "recent" for the mode switch. */
+export const BATTLE_COOLDOWN = 3;
+
+/**
+ * The creature's mode, decided by the situation, never by a model: battle while a living
+ * foe is in reach, or while an attack it noticed is recent; otherwise calm. Creatures
+ * without a calm section are always in battle mode.
+ */
+export function modeOf(wheel: Wheel, self: Id, archetype: Archetype): "battle" | "calm" {
+  if (!archetype.calm) return "battle";
+  const { world } = wheel;
+  const foeInReach = world.perceivable(self).some((t) => t.traits.actor && world.isAlive(t.id) && roleOf(world, self, t.id) === "foe");
+  if (foeInReach) return "battle";
+  const recentAttack = wheel.slip.recent(self, 20).some((e) => (e.name === "attacked" || e.name === "died") && e.tick > wheel.tick - BATTLE_COOLDOWN);
+  return recentAttack ? "battle" : "calm";
+}
+
+const CALM_FORMAT = [
+  "Answer with JSON only, exactly one of:",
+  '{"do": "emote", "text": "..."}   an action in the third person present tense, without your name, e.g. "wags its tail"',
+  '{"do": "say", "text": "..."}     words you say out loud',
+  '{"do": "nothing"}',
+].join("\n");
+
+/** The slow mind's instructions: persona, calm goal, and the one thing it may do: express itself. */
+export function calmSystem(world: World, self: Id, archetype: Archetype): string {
+  return [
+    `You are ${the(world.get(self))}, a creature in a text adventure.`,
+    `Persona: ${archetype.persona}`,
+    `There is no danger right now. ${archetype.calm!.goal}`,
+    "You only express yourself here: never claim to attack, take, open or move anything.",
+    "Keep it to one short sentence, in character. Often the best answer is a small gesture.",
+    CALM_FORMAT,
+  ].join("\n");
+}
+
+export type Expression = { verb: "emote" | "say"; text: string } | null;
+
+/**
+ * Validate what the slow mind said. Anything malformed becomes nothing: the engine never
+ * guesses what a model meant.
+ */
+export function expression(raw: string, name: string): Expression {
+  let parsed: unknown;
+  try {
+    parsed = parseJson(raw);
+  } catch {
+    return null;
+  }
+  const o = parsed as { do?: unknown; text?: unknown };
+  if (o.do !== "emote" && o.do !== "say") return null;
+  if (typeof o.text !== "string") return null;
+  let text = o.text.replace(/\s+/g, " ").trim().replace(/^["“]|["”]$/g, "");
+  if (o.do === "emote") {
+    // "Pebble wags its tail." -> "wags its tail": the engine adds the name itself
+    for (const lead of [`the ${name}`, name]) {
+      if (text.toLowerCase().startsWith(lead.toLowerCase()) && /[\s,]/.test(text.charAt(lead.length))) {
+        text = text.slice(lead.length).replace(/^[\s,]+/, "");
+        break;
+      }
+    }
+    text = text.replace(/[.!]+$/, "");
+  }
+  if (!text || text.length > 160) return null;
+  return { verb: o.do, text };
+}
+
+/** One calm thought: the role-framed view in, at most one expression out. */
+export async function calmThink(
+  wheel: Wheel,
+  self: Id,
+  archetype: Archetype,
+  reason: Reason,
+  options: { signal?: AbortSignal; heard?: string } = {},
+): Promise<{ expression: Expression; raw: string; state: Record<string, unknown> }> {
+  const dp = wheel.decisionPoint(self);
+  const view = mindView(wheel, self, archetype, dp, options.heard ? { heard: options.heard } : {});
+  const state = { ...view.state, goal: archetype.calm!.goal };
+  delete (state as { alerts?: unknown }).alerts;
+  const res = await reason.complete(
+    { system: calmSystem(wheel.world, self, archetype), messages: [{ role: "user", content: JSON.stringify(state) }], maxTokens: 120 },
+    options.signal ? { signal: options.signal } : {},
+  );
+  return { expression: expression(res.text, wheel.world.get(self).name), raw: res.text, state };
+}
+
 // --- when to think ---------------------------------------------------------------------------
 
 /**
@@ -267,17 +367,20 @@ export function mindView(wheel: Wheel, self: Id, archetype: Archetype, dp: Decis
  */
 export function attentive(wheel: Wheel, self: Id, archetype: Archetype) {
   let last = -1;
-  let lastPhase: string | undefined;
+  let lastSituation: string | undefined;
+  const situation = () => `${currentPhase(wheel.world, self, archetype).id}/${modeOf(wheel, self, archetype)}`;
+  // A golem's own words and gestures never wake it: otherwise every emote would beget another.
+  const ownExpression = (e: GameEvent) => e.actor === self && (e.name === "emoted" || e.name === "said");
   return {
     wants(): boolean {
       if (!wheel.world.has(self) || !wheel.world.isAlive(self)) return false;
-      const phase = currentPhase(wheel.world, self, archetype).id;
-      if (phase !== lastPhase) return true;
-      return noticed(wheel.world, self, wheel.slip.recent(self, 20), archetype).some((n) => n.tick > last);
+      if (situation() !== lastSituation) return true;
+      const events = wheel.slip.recent(self, 20).filter((e) => !ownExpression(e));
+      return noticed(wheel.world, self, events, archetype).some((n) => n.tick > last);
     },
     thought(): void {
       last = wheel.tick;
-      lastPhase = currentPhase(wheel.world, self, archetype).id;
+      lastSituation = situation();
     },
   };
 }

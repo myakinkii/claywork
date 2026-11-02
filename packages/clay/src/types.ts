@@ -211,6 +211,12 @@ export interface Archetype {
   hears?: Role[];
   /** How many noticed events it keeps in mind. Default 4. */
   memory?: number;
+  /**
+   * Calm mode: outside a fight, a slow language model expresses the creature (emote, say)
+   * instead of the fast decision model choosing moves. Without it, the creature is always
+   * in battle mode. Battle: a living foe in reach, or an attack it noticed in the last ticks.
+   */
+  calm?: { goal: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -226,6 +232,8 @@ export interface Intent {
   with?: Id;
   /** Free text, for "say". */
   text?: string;
+  /** The room it was decided in. If the actor has moved since, the moment has passed: dropped silently. */
+  where?: Id;
 }
 
 export type Scope =

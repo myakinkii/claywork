@@ -1,5 +1,5 @@
 import type { DecisionPoint, GameEvent, Id, Option, Thing } from "@claywork/clay";
-import { attentive, mindPolicy, orders, restricted, type MindOptions } from "./mind.ts";
+import { attentive, calmThink, mindPolicy, modeOf, orders, restricted, type MindOptions } from "./mind.ts";
 import { Choice, Noul, Score, getChoice, getNoul, getScore, type Reflex } from "@claywork/reflex";
 import type { Reason } from "@claywork/reason";
 import type { Wheel } from "@claywork/wheel";
@@ -261,6 +261,8 @@ export interface Minds {
   mutterEvery?: number;
   /** Decision budget per tick, in ms. Default 800. */
   deadlineMs?: number;
+  /** How long a calm (slow) thought may take, in ms. Default 8000: calm moments can wait. */
+  calmDeadlineMs?: number;
 }
 
 /** True when a living player shares the actor's room: someone to act for. */
@@ -309,8 +311,39 @@ export function awaken(wheel: Wheel, minds: Minds = {}, options: Pick<AnimateOpt
           return mind.decide(dp, signal);
         },
       };
-      const animated = animate(wheel, thing.id, { ...common, fallback: safeBrute, policy, awake: () => playerNearby(wheel, thing.id) && attention.wants() });
-      handles.push({ ...animated, stop: () => (animated.stop(), heard.stop()) });
+      const inBattle = () => modeOf(wheel, thing.id, archetype) === "battle";
+      const animated = animate(wheel, thing.id, {
+        ...common,
+        fallback: safeBrute,
+        policy,
+        awake: () => playerNearby(wheel, thing.id) && inBattle() && attention.wants(),
+      });
+      // Calm mode: the slow mind expresses the creature. Needs a calm section and a reason model.
+      let unCalm = () => {};
+      if (archetype.calm && minds.reason) {
+        const reason = minds.reason;
+        let busy = false;
+        unCalm = wheel.onTurn(() => {
+          if (busy || inBattle() || !playerNearby(wheel, thing.id) || !attention.wants()) return;
+          busy = true;
+          attention.thought();
+          const tick = wheel.tick;
+          const started = Date.now();
+          const heardNow = heard.current();
+          const where = wheel.world.roomOf(thing.id) ?? undefined;
+          calmThink(wheel, thing.id, archetype, reason, { signal: AbortSignal.timeout(minds.calmDeadlineMs ?? 8000), ...(heardNow ? { heard: heardNow } : {}) })
+            .then(({ expression }) => {
+              // the world may have turned to battle while it thought: then the moment has passed
+              if (expression && !inBattle() && wheel.world.isAlive(thing.id)) {
+                wheel.submit({ actor: thing.id, verb: expression.verb, text: expression.text, ...(where ? { where } : {}) });
+              }
+              options.onDecision?.({ option: expression?.verb ?? "nothing", why: expression ? `calm: ${expression.text}` : "calm: nothing", actor: thing.id, tick, source: reason.name, ms: Date.now() - started });
+            })
+            .catch((e: Error) => options.onDecision?.({ option: "nothing", why: `calm failed: ${e.message}`, actor: thing.id, tick, source: reason.name, ms: Date.now() - started }))
+            .finally(() => (busy = false));
+        });
+      }
+      handles.push({ ...animated, stop: () => (animated.stop(), heard.stop(), unCalm()) });
       return;
     }
     const policy = minds.reflex ? reflexPolicy(minds.reflex, { fallback: brute() }) : brute();
@@ -327,4 +360,8 @@ export function awaken(wheel: Wheel, minds: Minds = {}, options: Pick<AnimateOpt
   return handles;
 }
 
-export { attentive, currentPhase, describe, factionOf, frame, healthWord, mindPolicy, mindQuestion, mindView, noticed, orders, restricted, roleOf, type MindOptions, type MindView } from "./mind.ts";
+export {
+  BATTLE_COOLDOWN, attentive, calmSystem, calmThink, currentPhase, describe, expression, factionOf, frame, healthWord,
+  mindPolicy, mindQuestion, mindView, modeOf, noticed, orders, restricted, roleOf,
+  type Expression, type MindOptions, type MindView,
+} from "./mind.ts";

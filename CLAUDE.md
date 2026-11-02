@@ -44,11 +44,11 @@ committing: `npm run typecheck && npm test && npm run kiln`.
 | `kiln` | Validates scenarios: references, containment, verbs, art, reachability, then replays the walkthrough on a real wheel. Its error messages are written to be fed back to an LLM. |
 | `glaze` | Surfaces: `glaze()` view model, `toText`/`toHtml`, `understand()` command parser, `help()`, art renderers (`toSvg`, `toAnsi`, `toPlain`). |
 | `reflex` | System One interface (Choice/Score/Noul with probabilities), `FakeReflex`, and `SystemOneHttp` (TypeSafe System One protocol: Alibaba Model Studio, Jev, djev-run). |
-| `reason` | Language-model interface, `FakeReason`. No real adapter yet. |
-| `golems` | NPC minds: `Policy`, `brute`, `animate` (deadline, fallback, dormancy), `voice`, `awaken`. `mind.ts`: archetype minds, the main path: roles, role-framed perception (`frame`, `describe`), attention (`noticed`, `attentive`), standing `orders`, `mindView` (the exact state and choices sent), `mindPolicy`, `restricted`. `reflexPolicy` is the older per-option path for golems without an archetype. |
+| `reason` | Language-model interface, `FakeReason`, and `ChatCompletionsHttp` (OpenAI-compatible chat: Qwen on Model Studio). |
+| `golems` | NPC minds: `Policy`, `brute`, `animate` (deadline, fallback, dormancy), `voice`, `awaken`. `mind.ts`: archetype minds, the main path: roles, role-framed perception (`frame`, `describe`), attention (`noticed`, `attentive`), standing `orders`, `mindView` (the exact state and choices sent), `mindPolicy`, `restricted`, battle/calm `modeOf`, and `calmThink` (the slow mind: validated `expression`s only). `reflexPolicy` is the older per-option path for golems without an archetype. |
 | `workshop` | Server-side, transport-agnostic: shelf of fired worlds, `Instance` (wheel + golems), `Session` (survives disconnects: link-dead), protocol types, `createDebug`. |
 | `apps/server` | `ws` websocket adapter + `public/index.html` (single-file browser client). |
-| `apps/terminal` | `play.ts`, `kiln.ts`, `probe.ts`, `tiles.ts` (+ `tiles-lib.ts`: fire a world's test tiles). |
+| `apps/terminal` | `play.ts`, `kiln.ts`, `probe.ts`, `calm-probe.ts`, `tiles.ts` (+ `tiles-lib.ts`: fire a world's test tiles). |
 | `worlds/` | `<id>.json` scenarios, optional `<id>.minds.ts` (fresh `Minds` per instance), optional `<id>.tiles.json` (test tiles). |
 | `tools/art/` | Python + Pillow scripts that drew the sprites; seeded, reproducible. |
 

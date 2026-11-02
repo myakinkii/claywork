@@ -146,8 +146,10 @@ export function fire(scenario: Scenario): Firing {
     if (!config.summary) warn("no-summary", `World verb "${name}" has no summary, so /help can't explain it.`, at);
     for (const id of config.appliesTo?.ids ?? []) if (!exists(id)) error("missing-reference", `Applies to "${id}", which does not exist.`, at);
     const trait = config.appliesTo?.trait;
-    if (trait && !scenario.things.some((t) => t.traits[trait] !== undefined)) warn("applies-to-nothing", `Applies to things with trait "${trait}", but nothing has it.`, at);
-    if (!triggers.some((t) => t.on === name)) warn("meaningless-verb", `World verb "${name}" has no triggers, so it can only ever say "Nothing happens."`, at);
+    const everything = [...scenario.things, ...(scenario.player?.companions ?? [])];
+    if (trait && !everything.some((t) => t.traits[trait] !== undefined)) warn("applies-to-nothing", `Applies to things with trait "${trait}", but nothing has it.`, at);
+    // nothing: "" says the answer comes from elsewhere (a golem's mind), so no triggers is fine
+    if (!triggers.some((t) => t.on === name) && config.nothing !== "") warn("meaningless-verb", `World verb "${name}" has no triggers, so it can only ever say "Nothing happens."`, at);
   }
   for (const trig of triggers) {
     if (trig.on !== "enter" && !known.has(trig.on)) error("unknown-verb", `Triggers on "${trig.on}", which is not a verb in this world.`, `trigger:${trig.id}`);
@@ -196,6 +198,7 @@ export function fire(scenario: Scenario): Firing {
       if (!v || !role || !known.has(v) || !ROLES.has(role)) error("bad-forbid", `Forbidden move "${f}" should be verb:role, e.g. "attack:master".`, at);
     }
     for (const r of arc.hears ?? []) if (!ROLES.has(r)) error("bad-role", `"${id}" hears "${r}", which is not a role (${[...ROLES].join(", ")}).`, at);
+    if (arc.calm && !arc.calm.goal?.trim()) error("empty-calm", `"${id}" has a calm mode with no goal.`, at);
     // Goals ask for behaviors in the options' words; asking for one the repertoire lacks is a crack.
     for (const phase of arc.phases ?? []) {
       for (const [v, pattern, words] of BEHAVIOR_WORDS) {

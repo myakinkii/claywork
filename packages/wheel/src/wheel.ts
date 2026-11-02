@@ -8,7 +8,7 @@ import { STILL_VERBS, overhear, sight } from "./senses.ts";
 import { pickArt } from "@claywork/glyphs";
 
 /** How an intent turned out, for simulations and tests. */
-export type Outcome = "done" | "failed" | "unable" | "blocked";
+export type Outcome = "done" | "failed" | "unable" | "blocked" | "stale";
 
 export interface WheelOptions {
   verbs?: Verb[];
@@ -239,6 +239,7 @@ export class Wheel {
     };
 
     if (!world.has(actor) || !world.isAlive(actor)) return [];
+    if (intent.where !== undefined && world.roomOf(actor) !== intent.where) return outcome("stale", []);
     // Doing anything else breaks stillness and attention; wait and listen count stillness up.
     if (!STILL_VERBS.has(intent.verb) && world.get(actor).traits.actor) {
       world.setProp(actor, "actor.still", 0);

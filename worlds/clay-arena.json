@@ -91,7 +91,7 @@
         "id": "pebble",
         "name": "Pebble",
         "description": "A clay hound the size of a wolf, warm to the touch. It watches you, waiting.",
-        "traits": { "actor": { "kind": "npc", "archetype": "pet" }, "vitals": { "hp": 14, "maxHp": 14 } },
+        "traits": { "actor": { "kind": "npc", "archetype": "pet" }, "vitals": { "hp": 14, "maxHp": 14 }, "pettable": {} },
         "carrying": [{ "id": "teeth", "name": "clay teeth", "traits": { "weapon": { "damage": 3 } } }]
       }
     ]
@@ -107,7 +107,10 @@
       ],
       "repertoire": ["attack", "wait"],
       "forbid": ["attack:master", "attack:ally"],
-      "hears": ["master"]
+      "hears": ["master"],
+      "calm": {
+        "goal": "React to your master in character with a small gesture. You are a clay hound: you cannot speak, you can only bark, growl, whine, wag, nuzzle and lean."
+      }
     },
     "warden": {
       "persona": "The Clay Warden, an ancient guardian of fired clay. Proud and slow, it never leaves its arena.",
@@ -125,6 +128,17 @@
       "repertoire": ["attack", "go", "wait"],
       "forbid": ["attack:master", "attack:ally"],
       "hears": ["master"]
+    }
+  },
+  "verbs": {
+    "pet": {
+      "summary": "Pet a creature that lets you. It may have something to say about it.",
+      "phrase": "pet",
+      "aliases": ["stroke", "scratch"],
+      "appliesTo": { "trait": "pettable" },
+      "text": "{Actor} pets {target}.",
+      "you": "You pet {target}.",
+      "nothing": ""
     }
   },
   "triggers": [

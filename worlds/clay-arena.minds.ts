@@ -1,8 +1,23 @@
-// Minds for the Clay Arena. With REFLEX_URL set, every golem decides with the real System
-// One model through its archetype. Without it, a fake with simple instincts stands in, so
-// the arena is playable and testable offline. The fake matches words, as the real one mostly does.
+// Minds for the Clay Arena. With REFLEX_URL set, every golem fights with the real System One
+// model; with REASON_URL set, Pebble's calm moments come from a real chat model (Qwen). Without
+// them, fakes stand in, so the arena is playable and testable offline.
 import { FakeReflex, reflexFromEnv, type FakeRule } from "@claywork/reflex";
+import { FakeReason, reasonFromEnv } from "@claywork/reason";
 import type { Minds } from "@claywork/golems";
+
+/** A stand-in for the chat model: a few clay-hound gestures, chosen by what just happened. */
+const calmFake = () =>
+  new FakeReason((req) => {
+    // react to the latest thing noticed, as a real model would weigh it most
+    let latest = "";
+    try {
+      latest = (JSON.parse(req.messages.at(-1)?.content ?? "{}") as { noticed?: string[] }).noticed?.at(-1) ?? "";
+    } catch {}
+    if (/pets you/.test(latest)) return '{"do": "emote", "text": "leans into your hand and rumbles like a cooling kiln"}';
+    if (/says:/.test(latest)) return '{"do": "emote", "text": "tilts its head and thumps its stubby clay tail"}';
+    if (/kills/.test(latest)) return '{"do": "emote", "text": "sniffs the heap of dust, then sneezes"}';
+    return '{"do": "nothing"}';
+  }, { latencyMs: 300 });
 
 const instincts: FakeRule = ({ question, state }) => {
   if (question.type !== "choice") return undefined;
@@ -30,6 +45,7 @@ export default function minds(): Minds {
   const real = reflexFromEnv();
   return {
     reflex: real ?? new FakeReflex({ latencyMs: [40, 160], rules: [instincts] }),
+    reason: reasonFromEnv() ?? calmFake(),
     deadlineMs: Number(process.env.REFLEX_DEADLINE_MS ?? (real ? 1500 : 800)),
   };
 }

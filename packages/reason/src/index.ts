@@ -67,3 +67,5 @@ export class FakeReason implements Reason {
     return { text, latencyMs: Date.now() - started };
   }
 }
+
+export { ChatCompletionsHttp, ChatError, assertRealUrl, reasonFromEnv, type ChatOptions } from "./http.ts";

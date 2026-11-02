@@ -90,3 +90,12 @@ test("help separates the engine's verbs from the world's own", () => {
   assert.doesNotMatch(engine!, /pray/);
   assert.match(world!, /pray at <thing>\s+Kneel and pray\. Some places listen\. \(also: kneel\)/);
 });
+
+test("emote: players act things out, and it reads in the third person", () => {
+  const { wheel, parse } = setup();
+  const cmd = parse("emote waves at the goblin");
+  assert.deepEqual(intentOf(cmd), { actor: "anna", verb: "emote", text: "waves at the goblin" });
+  wheel.submit((cmd as Extract<Command, { kind: "act" }>).intent);
+  const [e] = wheel.turn().filter((x) => x.actor === "anna");
+  assert.equal(e!.text, "Anna waves at the goblin.");
+});

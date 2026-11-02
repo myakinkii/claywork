@@ -361,6 +361,28 @@ const say: Verb = {
   },
 };
 
+/** A small piece of acting, in the third person: "emote waves" shows "Max waves." */
+const emote: Verb = {
+  name: "emote",
+  summary: "Act out something small: a gesture, a look, a sound. Everyone here sees it.",
+  usage: "emote <action>   (e.g. emote waves)",
+  aliases: ["me"],
+  freeText: true,
+  check: ({ intent }) => {
+    const text = intent.text?.trim() ?? "";
+    if (!text) return "Emote what?";
+    if (text.length > 200) return "That's a lot of acting. Keep it short.";
+    return null;
+  },
+  options: () => [],
+  perform({ world, actor, intent }) {
+    const who = world.get(actor);
+    const action = intent.text!.trim().replace(/\s+/g, " ").replace(/[.!]*$/, "");
+    const text = `${cap(the(who))} ${action}.`;
+    return { events: [{ name: "emoted", scope: roomScope(world, actor), actor, text, you: text, data: { words: action } }] };
+  },
+};
+
 const wait: Verb = {
   name: "wait",
   summary: "Do nothing for a moment.",
@@ -417,4 +439,4 @@ const listen: Verb = {
   },
 };
 
-export const standardVerbs: Verb[] = [look, search, listen, go, take, drop, toggle("open", true), toggle("close", false), unlock, attack, say, wait];
+export const standardVerbs: Verb[] = [look, search, listen, go, take, drop, toggle("open", true), toggle("close", false), unlock, attack, say, emote, wait];

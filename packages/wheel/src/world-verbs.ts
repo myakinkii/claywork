@@ -33,7 +33,9 @@ export function worldVerb(name: string, config: VerbConfig): Verb {
       return null;
     },
     perform({ world, actor, intent }) {
-      if (!config.text && !config.you) return { events: [], silent: config.nothing ?? "Nothing happens." };
+      // nothing: "" means the verb is quiet when no trigger answers (a golem's reaction may follow)
+      const silent = config.nothing === "" ? {} : { silent: config.nothing ?? "Nothing happens." };
+      if (!config.text && !config.you) return { events: [], ...silent };
       const room = world.roomOf(actor);
       const fill = (template: string) => template.replace(/\{(actor|Actor|target|Target)\}/g, (_m, key: string) => {
         const id: Id | undefined = key.toLowerCase() === "actor" ? actor : intent.target;
@@ -49,8 +51,10 @@ export function worldVerb(name: string, config: VerbConfig): Verb {
           ...(intent.target ? { target: intent.target } : {}),
           text: config.text ? fill(config.text) : you,
           you,
+          // kept so minds can re-render it from their own point of view
+          ...(config.text ? { data: { template: config.text } } : {}),
         }],
-        silent: config.nothing ?? "Nothing happens.",
+        ...silent,
       };
     },
   };

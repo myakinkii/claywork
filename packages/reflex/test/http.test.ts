@@ -116,3 +116,10 @@ test("configured from the environment, or not at all", () => {
   const r = reflexFromEnv({ REFLEX_URL: "https://ws.example.com/compatible-mode/v1/systemone", DASHSCOPE_API_KEY: "sk-x" });
   assert.equal(r?.name, "decision-model-preview");
 });
+
+test("a URL with a leftover placeholder is refused before any request", () => {
+  assert.throws(
+    () => new SystemOneHttp({ url: "https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/systemone", model: "m" }),
+    /still contains the placeholder \{WorkspaceId\}/,
+  );
+});

@@ -46,6 +46,8 @@ export class SystemOneHttp implements Reflex {
 
   constructor(options: SystemOneOptions) {
     if (!/^https?:\/\//.test(options.url)) throw new SystemOneError(`Not an http(s) URL: ${options.url}`);
+    const placeholder = /\{[^}]*\}/.exec(options.url);
+    if (placeholder) throw new SystemOneError(`The URL still contains the placeholder ${placeholder[0]}; put your real value there: ${options.url}`);
     this.#options = options;
     this.name = options.model;
   }

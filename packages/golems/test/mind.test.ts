@@ -212,3 +212,91 @@ test("constraints hold on fallback paths too", async () => {
   assert.notEqual(d.option, "attack:max", "with no foes in reach, the brute would have attacked the master");
   assert.equal(d.option, "wait");
 });
+
+// --- calm mode -------------------------------------------------------------------------------
+
+import { FakeReason } from "@claywork/reason";
+import { calmSystem, calmThink, modeOf, BATTLE_COOLDOWN } from "@claywork/golems";
+
+const CALM_PET: Archetype = { ...ARCHETYPES.pet!, calm: { goal: "React to your master with a small gesture. You cannot speak." } };
+
+function calmSetup() {
+  const s = arena();
+  s.archetypes = { ...ARCHETYPES, pet: CALM_PET };
+  s.verbs = { pet: { summary: "Pet a creature.", phrase: "pet", appliesTo: { trait: "pettable" }, text: "{Actor} pets {target}.", you: "You pet {target}.", nothing: "" } };
+  s.player!.companions![0]!.traits.pettable = {};
+  s.spawn = "gate";
+  const wheel = new Wheel(s);
+  wheel.join({ id: "max", name: "Max" });
+  return { wheel, w: wheel.world };
+}
+
+test("modes: calm away from foes, battle in reach of one or right after an attack", () => {
+  const { wheel, w } = calmSetup();
+  assert.equal(modeOf(wheel, "max-pebble", CALM_PET), "calm", "the gate is quiet");
+  w.move("max", "arena");
+  w.move("max-pebble", "arena");
+  assert.equal(modeOf(wheel, "max-pebble", CALM_PET), "battle", "the Warden is in reach");
+  assert.equal(modeOf(wheel, "m1", ARCHETYPES.minion!), "battle", "no calm section: always battle");
+  wheel.submit({ actor: "warden", verb: "attack", target: "max" });
+  wheel.turn();
+  w.move("max", "gate");
+  w.move("max-pebble", "gate");
+  assert.equal(modeOf(wheel, "max-pebble", CALM_PET), "battle", "the attack is still fresh");
+  for (let i = 0; i < BATTLE_COOLDOWN; i++) wheel.turn();
+  assert.equal(modeOf(wheel, "max-pebble", CALM_PET), "calm");
+});
+
+test("a world verb is re-rendered in roles: the pet feels its master's hand", () => {
+  const { wheel } = calmSetup();
+  wheel.submit({ actor: "max", verb: "pet", target: "max-pebble" });
+  const [e] = wheel.turn();
+  assert.equal(frame(wheel.world, "max-pebble", e!), "Your master Max pets you.");
+  assert.equal(e!.you, "You pet Pebble.");
+});
+
+test("a calm thought: persona and calm goal in, one validated expression out", async () => {
+  const { wheel } = calmSetup();
+  wheel.submit({ actor: "max", verb: "pet", target: "max-pebble" });
+  wheel.turn();
+  const reason = new FakeReason(['```json\n{"do": "emote", "text": "Pebble leans into your hand."}\n```']);
+  const r = await calmThink(wheel, "max-pebble", CALM_PET, reason);
+  assert.deepEqual(r.expression, { verb: "emote", text: "leans into your hand" });
+  const system = reason.requests[0]!.system!;
+  assert.match(system, /loyal clay hound/);
+  assert.match(system, /You cannot speak/);
+  assert.match(system, /never claim to attack/);
+  assert.ok((r.state.noticed as string[]).includes("Your master Max pets you."));
+  assert.equal(calmSystem(wheel.world, "max-pebble", CALM_PET).includes('{"do": "nothing"}'), true);
+});
+
+test("awakened calm: petting earns an emote, and the emote doesn't wake it again", async () => {
+  const { wheel } = calmSetup();
+  const reason = new FakeReason(['{"do": "emote", "text": "wags its tail"}']);
+  const handles = awaken(wheel, { reflex: new FakeReflex(), reason });
+  wheel.turn();
+  await sleep(10);
+  wheel.turn(); // let the welcome emote (a thought about Max arriving) resolve first
+  await sleep(10);
+  const emotesOf = () => wheel.slip.log.filter((e) => e.name === "emoted" && e.actor === "max-pebble");
+  const before = reason.requests.length;
+  const emotedBefore = emotesOf().length; // a new situation (Max arriving) is worth one thought too
+  wheel.submit({ actor: "max", verb: "pet", target: "max-pebble" });
+  for (let i = 0; i < 5; i++) {
+    wheel.turn();
+    await sleep(15);
+  }
+  assert.equal(emotesOf().length - emotedBefore, 1, "one petting, one emote");
+  assert.equal(emotesOf().at(-1)!.text, "Pebble wags its tail.");
+  assert.equal(reason.requests.length - before, 1, "its own emote never triggered another thought");
+  for (const h of handles) h.stop();
+});
+
+test("a stale intent is dropped: the moment passed when the actor moved", () => {
+  const { wheel, w } = calmSetup();
+  wheel.submit({ actor: "max-pebble", verb: "emote", text: "wags its tail", where: "gate" });
+  w.move("max-pebble", "arena");
+  const events = wheel.turn();
+  assert.equal(wheel.outcome("max-pebble"), "stale");
+  assert.ok(!events.some((e) => e.name === "emoted"));
+});

@@ -156,6 +156,19 @@ Nine rounds of probes against a real System One model (`decision-model-preview`)
 
 Rules for writing goals (by hand or by the Potter): single triggers in the options' own words ("Attack whoever attacks your master."), no "and", no "otherwise", persona and goals that agree (character words act as strong priors), and constraints in `forbid`, not in prose.
 
+### Battle and calm: two brains
+
+Like the battle mode of a CRPG, a creature's mind switches with the situation, and the engine decides, never a model: **battle** while a living foe is in reach or an attack it noticed is fresh (3 ticks), **calm** otherwise. In battle the fast System One model picks moves. In calm, a slow language model expresses the creature: an archetype's `calm.goal` and persona go into its instructions, the same role-framed view goes in as the message, and it answers in a fixed JSON shape, `{"do": "emote" | "say" | "nothing", "text": ...}`. The engine validates it: anything malformed, too long, or claiming an action becomes nothing. So the slow brain can only *express*, never act, and speech never competes with an attack again: talking is for calm moments.
+
+`emote` is a standard verb for players too (`emote waves` shows "Max waves."). In the arena you can `pet Pebble`, and Pebble's calm mind answers. A creature's own words and gestures never wake it to think again, and an expression decided in one room is dropped if the creature has moved on (`Intent.where`).
+
+```bash
+npm run probe:calm     # Pebble's calm mind in six situations (REASON_URL for the real chat model)
+PROMPT=1 SHOW=1 npm run probe:calm
+```
+
+The chat model is configured like the decision model: `REASON_URL` (Model Studio's `.../compatible-mode/v1/chat/completions` works with Qwen), `REASON_MODEL` (default `qwen3.8-flash`), `REASON_KEY` or `DASHSCOPE_API_KEY`. Thinking is off unless `REASON_THINKING=1`: a clay hound doesn't need to deliberate over its tail.
+
 ### Test tiles
 
 Before glazing a pot, potters fire test tiles. `worlds/<id>.tiles.json` builds situations in the real world (intents and glyph edits), lets the engine render what one golem perceives, and checks the model's choice:
@@ -191,8 +204,8 @@ Pictures need eyes: in the dark, or blind, you get the words without the art. Ev
 ## Next
 
 - Give the Drowned Cellar's goblin an archetype and tiles; it still uses the older per-option `reflexPolicy`.
-- A `Reason` adapter so voices really answer. Qwen works on the same Model Studio workspace through OpenAI-compatible chat completions (`.../compatible-mode/v1/chat/completions`, model `qwen3.8-flash`); send `enable_thinking: false` for speed (thinking took 3.4 s for one line) and ignore `reasoning_content`.
-- A speech lane: today a golem's `say` replaces its queued action (one intent per actor per tick), which is why archetype golems have no voices yet. Either one say plus one action per tick, or speech deliberately costs the turn.
+- Calm actions, starting with fetch: let the calm mind choose real legal moves too (`sit`, `fetch the sword`), validated like everything else.
+- Voices for the Drowned Cellar's goblin through the calm mind, replacing its scripted `FakeReason` lines.
 - System Two steering: a language model that rewrites a golem's goal or phase mid-game, which the fast System One loop then follows.
 - ADK (TypeScript) agents as `Policy` / voice implementations for slow NPCs.
 - Spawning adds mid-fight (a `spawn` effect with creature templates); `awaken` already animates golems that appear later.
