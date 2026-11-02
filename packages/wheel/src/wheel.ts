@@ -81,6 +81,20 @@ export class Wheel {
     this.#publish([
       { name: "entered", scope: { kind: "room", room: this.scenario.spawn }, actor: thing.id, text: `${thing.name} appears.`, you: this.scenario.intro ?? "You arrive." },
     ]);
+    // Companions join with the player and serve them; their items come along.
+    for (const template of this.scenario.player?.companions ?? []) {
+      const { carrying = [], ...body } = structuredClone(template);
+      const id = `${thing.id}-${template.id}`;
+      const companion = this.world.add({
+        ...body,
+        id,
+        location: this.scenario.spawn,
+        traits: { ...body.traits, actor: { ...(body.traits.actor ?? {}), serves: thing.id, companion: true } },
+      });
+      for (const item of carrying) this.world.add({ ...item, id: `${id}-${item.id}`, location: id });
+      this.slip.track(companion.id);
+      this.#publish([{ name: "entered", scope: { kind: "room", room: this.scenario.spawn }, actor: id, text: `${companion.name} comes with ${thing.name}.` }]);
+    }
     return thing;
   }
 
@@ -90,6 +104,9 @@ export class Wheel {
    */
   leave(actor: Id): void {
     if (!this.world.has(actor)) return;
+    for (const t of [...this.world.things.values()]) {
+      if (t.traits.actor?.companion && t.traits.actor.serves === actor && t.location !== null) this.leave(t.id);
+    }
     const room = this.world.roomOf(actor);
     const who = this.world.get(actor);
     for (const item of this.world.children(actor)) this.world.move(item.id, room);
@@ -254,6 +271,7 @@ export class Wheel {
     if (performed.entered) {
       const enter = fire(triggers, { on: "enter", phase: "after" }, { world, actor: intent.actor, target: performed.entered }, this.#fired);
       events.push(...enter.events);
+      events.push(...this.#follow(intent.actor, performed.entered));
     }
     return events;
   }
@@ -282,6 +300,22 @@ export class Wheel {
           drafts.push({ name: "beheld", scope: { kind: "actor", actor: player.id }, actor: player.id, target: t.id, text: t.description ?? t.name, art });
         }
       }
+    }
+    return drafts;
+  }
+
+  /** Companions follow their master through exits, like followers in old MUDs. Not a decision. */
+  #follow(master: Id, to: Id): EventDraft[] {
+    const { world } = this;
+    const drafts: EventDraft[] = [];
+    for (const t of world.things.values()) {
+      const a = t.traits.actor;
+      if (!a?.companion || a.serves !== master || t.location === to || t.location === null || !world.isAlive(t.id)) continue;
+      const from = world.roomOf(t.id);
+      if (!from || from === to) continue;
+      drafts.push({ name: "left", scope: { kind: "room", room: from }, actor: t.id, text: `${t.name} follows ${world.get(master).name}.` });
+      world.move(t.id, to);
+      drafts.push({ name: "entered", scope: { kind: "room", room: to }, actor: t.id, text: `${t.name} follows ${world.get(master).name} in.` });
     }
     return drafts;
   }

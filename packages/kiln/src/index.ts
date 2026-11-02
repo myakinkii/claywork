@@ -158,6 +158,54 @@ export function fire(scenario: Scenario): Firing {
 
   for (const [flag, at] of flagsUsed) if (!flagsWritten.has(flag)) error("flag-never-set", `Reads flag "${flag}", which nothing ever sets.`, at);
 
+  // --- minds ------------------------------------------------------------------
+  const archetypes = scenario.archetypes ?? {};
+  const ROLES = new Set(["self", "master", "servant", "ally", "foe", "other"]);
+  const usedArchetypes = new Set<string>();
+  const actors = [...scenario.things, ...(scenario.player?.companions ?? [])];
+  for (const t of actors) {
+    const a = t.traits.actor;
+    if (!a) continue;
+    if (a.archetype) {
+      usedArchetypes.add(a.archetype);
+      if (!(a.archetype in archetypes)) error("missing-archetype", `"${t.id}" thinks with archetype "${a.archetype}", which is not defined.`, t.id);
+    }
+    if (a.serves !== undefined) {
+      if (a.serves === t.id) error("serves-self", `"${t.id}" serves itself.`, t.id);
+      else if (!byId.get(a.serves)?.traits.actor) error("serves-nobody", `"${t.id}" serves "${a.serves}", which is not an actor.`, t.id);
+    }
+  }
+  for (const c of scenario.player?.companions ?? []) {
+    if (!c.traits.actor) error("companion-not-actor", `Companion "${c.id}" has no actor trait.`, `companion:${c.id}`);
+    if (c.traits.actor?.serves) warn("companion-serves", `Companion "${c.id}" sets "serves"; it is always set to the joining player.`, `companion:${c.id}`);
+  }
+  const BEHAVIOR_WORDS: [verb: string, pattern: RegExp, words: string][] = [
+    ["attack", /\battack/i, "attack"],
+    ["go", /\brun away\b/i, "run away"],
+    ["wait", /\bstay\b/i, "stay"],
+  ];
+  for (const [id, arc] of Object.entries(archetypes)) {
+    const at = `archetype:${id}`;
+    if (!usedArchetypes.has(id)) warn("unused-archetype", `Archetype "${id}" is used by no actor.`, at);
+    if (!arc.phases?.length) error("no-phases", `Archetype "${id}" has no phases, so no goal.`, at);
+    else if (arc.phases.every((p) => p.when)) warn("no-default-phase", `Every phase of "${id}" has a condition; when none holds, the last one is used anyway.`, at);
+    for (const phase of arc.phases ?? []) if (phase.when) checkRefs(phase.when, `${at}:${phase.id}`);
+    for (const v of arc.repertoire ?? []) if (!known.has(v)) error("unknown-verb", `Repertoire of "${id}" has "${v}", which is not a verb in this world.`, at);
+    for (const f of arc.forbid ?? []) {
+      const [v, role] = f.split(":");
+      if (!v || !role || !known.has(v) || !ROLES.has(role)) error("bad-forbid", `Forbidden move "${f}" should be verb:role, e.g. "attack:master".`, at);
+    }
+    for (const r of arc.hears ?? []) if (!ROLES.has(r)) error("bad-role", `"${id}" hears "${r}", which is not a role (${[...ROLES].join(", ")}).`, at);
+    // Goals ask for behaviors in the options' words; asking for one the repertoire lacks is a crack.
+    for (const phase of arc.phases ?? []) {
+      for (const [v, pattern, words] of BEHAVIOR_WORDS) {
+        if (pattern.test(phase.goal) && !arc.repertoire.includes(v) && !/\bnever\b/i.test(phase.goal.split(/[.!]/).find((s) => pattern.test(s)) ?? "")) {
+          warn("goal-beyond-repertoire", `Phase "${phase.id}" of "${id}" asks to "${words}", but "${v}" is not in its repertoire.`, at);
+        }
+      }
+    }
+  }
+
   // --- art --------------------------------------------------------------------
   const sprites = scenario.art ?? {};
   const usedArt = new Set<string>();

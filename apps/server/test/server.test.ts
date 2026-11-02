@@ -96,7 +96,7 @@ test("health tells you the server is really yours", async () => {
   const { workshop, server, port } = await boot();
   try {
     const res = await fetch(`http://127.0.0.1:${port}/health`);
-    assert.deepEqual(await res.json(), { ok: true, worlds: 1, instances: 0, sessions: 0 });
+    assert.deepEqual(await res.json(), { ok: true, worlds: 2, instances: 0, sessions: 0 });
   } finally {
     workshop.close();
     server.close();

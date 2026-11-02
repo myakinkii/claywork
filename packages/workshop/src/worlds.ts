@@ -24,7 +24,8 @@ export interface Rejected {
 export async function loadWorlds(dir: string): Promise<{ shelf: ShelvedWorld[]; rejected: Rejected[] }> {
   const shelf: ShelvedWorld[] = [];
   const rejected: Rejected[] = [];
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
+  // <id>.json are worlds; <id>.tiles.json are their test tiles, not worlds
+  for (const file of readdirSync(dir).filter((f) => f.endsWith(".json") && !f.endsWith(".tiles.json")).sort()) {
     const scenario = loadScenario(join(dir, file));
     const { ok, cracks } = fire(scenario);
     if (!ok) {

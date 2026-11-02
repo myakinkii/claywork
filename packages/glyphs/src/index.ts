@@ -5,6 +5,9 @@ export interface GlyphContext {
   world: World;
   actor?: Id;
   target?: Id;
+  /** For minds: the golem thinking, and its master. "$self" falls back to the actor. */
+  self?: Id;
+  master?: Id;
 }
 
 export function resolve(ref: Ref, ctx: GlyphContext): Id {
@@ -15,6 +18,15 @@ export function resolve(ref: Ref, ctx: GlyphContext): Id {
   if (ref === "$target") {
     if (!ctx.target) throw new Error("$target used outside of a target context");
     return ctx.target;
+  }
+  if (ref === "$self") {
+    const self = ctx.self ?? ctx.actor;
+    if (!self) throw new Error("$self used outside of a mind");
+    return self;
+  }
+  if (ref === "$master") {
+    if (!ctx.master) throw new Error("$master used, but this actor serves no one");
+    return ctx.master;
   }
   return ref;
 }
@@ -48,6 +60,12 @@ export function check(cond: Condition, ctx: GlyphContext): boolean {
   if ("trait" in cond) {
     const [thing, trait] = cond.trait;
     return world.hasTrait(resolve(thing, ctx), trait);
+  }
+  if ("alive" in cond) {
+    const ref = cond.alive;
+    if (ref === "$master" && !ctx.master) return false;
+    const id = resolve(ref, ctx);
+    return world.has(id) && world.get(id).location !== null && world.isAlive(id);
   }
   if ("still" in cond) {
     const [actor, ticks] = cond.still;
@@ -151,6 +169,7 @@ export function references(node: Condition | Effect): Id[] {
     else if ("actorIs" in n) add(n.actorIs);
     else if ("trait" in n) add(n.trait[0]);
     else if ("still" in n) add(n.still[0]);
+    else if ("alive" in n) add(n.alive);
     else if ("grant" in n) add(n.grant[0]);
     else if ("revoke" in n) add(n.revoke[0]);
     else if ("set" in n) add(n.set[0]);

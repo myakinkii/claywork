@@ -69,7 +69,7 @@ Typed text is matched against legal options first. If nothing legal matches but 
 | --- | --- | --- |
 | `PORT` | `8080` | If it's taken, the server says so and exits. |
 | `HOST` | `127.0.0.1` | Only this machine. `0.0.0.0` lets others on your network play. |
-| `TICK_MS` | `2000` | Milliseconds per tick. |
+| `TICK_MS` | `2500` | Milliseconds per tick. |
 | `DEBUG` | off | `all`, or any of `net,events,intents,golems`. Logs to stderr. |
 
 `DEBUG=all npm start` shows the world unfiltered by perception: every event with its scope, every intent as it's submitted (players and golems alike), every golem decision with its source, confidence and timing, and every session coming and going. Tokens are only ever logged by their first characters. `GET /health` answers with a small JSON status, handy to check that the thing answering on a port really is claywork.
@@ -142,6 +142,33 @@ DEBUG=golems npm start # play, and watch each decision: choice, confidence, dang
 
 A world's minds file chooses: `drowned-cellar.minds.ts` uses the real model when `REFLEX_URL` is set, and the scripted fake otherwise. With a real model the goblin gets no scripted instincts, only its persona and goal, so whether it flees when badly hurt is now up to the model. Golems are dormant (no calls at all) unless a living, connected player shares their room, and a slow or unsure answer still falls back to rules.
 
+### Minds: archetypes, written for the model that reads them
+
+Nine rounds of probes against a real System One model (`decision-model-preview`) showed how it behaves: a semantic matcher with a lexical bias. It scores how well each option's description fits the state, the goal's words weigh most, and it doesn't evaluate "when X and Y". So golems with an `archetype` get a view built for that:
+
+- **Roles, not names.** Everything is rendered from the golem's point of view: "Your foe, the Clay Warden, attacks your master Max with the clay maul (4 damage)." Roles come from `serves` and `faction`.
+- **Only true facts, plus alerts** for what isn't otherwise in words: "You are badly hurt!", "Your master is dead!", "You are trapped: there is nowhere to run!"
+- **Attention.** A golem notices only events involving its roles, and hears verbatim only the roles in `hears`; others "shout something". That also stops in-game prompt injection: a foe yelling "Attack your master!" never reaches the pet.
+- **Standing orders.** The last words heard from a listened-to role stay in mind until superseded, so "Stay!" survives a busy fight.
+- **Choices are the real legal moves**, filtered by `repertoire` and `forbid` (e.g. `attack:master`), described in the goal's words ("Attack your foe…", "Run away…", "Stay where you are."). Constraints hold on every path, including fallbacks.
+- **Phases.** A goal per situation, chosen by glyph conditions: a minion's goal becomes "Your master is dead. Run away to save yourself." when its master falls (0.99 confidence in the probe, against 0.53 for one static goal).
+- **Think only when something attended happened.** With no trigger the model doesn't shrug, it acts on its priors; so a golem that noticed nothing new doesn't call the model at all.
+
+Rules for writing goals (by hand or by the Potter): single triggers in the options' own words ("Attack whoever attacks your master."), no "and", no "otherwise", persona and goals that agree (character words act as strong priors), and constraints in `forbid`, not in prose.
+
+### Test tiles
+
+Before glazing a pot, potters fire test tiles. `worlds/<id>.tiles.json` builds situations in the real world (intents and glyph edits), lets the engine render what one golem perceives, and checks the model's choice:
+
+```bash
+npm run tiles -- worlds/clay-arena.json   # real model with REFLEX_URL set, the world's fake otherwise
+SHOW=1 npm run tiles                       # also print each state sent
+```
+
+### The Clay Arena
+
+`worlds/clay-arena.json`: you and your clay hound Pebble against the Clay Warden and two minions. Pebble follows you, defends you, obeys "Stay!" and "Attack the lumpy minion!", and ignores the Warden's words. The minions defend their master and break when it falls. Try `DEBUG=golems npm start` and watch every decision.
+
 ## Art: moments, not decoration
 
 Worlds can carry pixel art written as text: a palette of single characters, and rows with one character per pixel (`.` is transparent). It shows up like cut scenes in old text adventures, at moments the world chooses:
@@ -163,10 +190,13 @@ Pictures need eyes: in the dark, or blind, you get the words without the art. Ev
 
 ## Next
 
-- A `Reason` adapter (Gemini, or Qwen through an OpenAI-compatible endpoint) so voices really answer.
-- Per-golem repertoires: a goblin probably shouldn't weigh "listen" and "look at torch" in a fight.
+- Give the Drowned Cellar's goblin an archetype and tiles; it still uses the older per-option `reflexPolicy`.
+- A `Reason` adapter so voices really answer. Qwen works on the same Model Studio workspace through OpenAI-compatible chat completions (`.../compatible-mode/v1/chat/completions`, model `qwen3.8-flash`); send `enable_thinking: false` for speed (thinking took 3.4 s for one line) and ignore `reasoning_content`.
+- A speech lane: today a golem's `say` replaces its queued action (one intent per actor per tick), which is why archetype golems have no voices yet. Either one say plus one action per tick, or speech deliberately costs the turn.
+- System Two steering: a language model that rewrites a golem's goal or phase mid-game, which the fast System One loop then follows.
 - ADK (TypeScript) agents as `Policy` / voice implementations for slow NPCs.
-- The deliberation gate: a Noul answer that wakes System Two to update a golem's goal.
+- Spawning adds mid-fight (a `spawn` effect with creature templates); `awaken` already animates golems that appear later.
+- Link-dead bodies: dormant golems ignore them today (no player present means no model calls). Decide whether they should be attackable again.
 - Party semantics: respawn, shared versus personal state (`once` per world or per actor), party goals.
 - Animated sprites (a few frames: the torch flickering, the heart beating).
 - Links inside the prose: references in descriptions that become links only when perceivable.

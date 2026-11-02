@@ -1,0 +1,100 @@
+{
+  "player": { "id": "max", "name": "Max" },
+  "tiles": [
+    {
+      "id": "pet defends its master",
+      "actor": "max-pebble",
+      "setup": [
+        { "move": ["max", "arena"] }, { "move": ["max-pebble", "arena"] },
+        { "do": { "actor": "warden", "verb": "attack", "target": "max" } }
+      ],
+      "expect": "attack:warden",
+      "note": "Round 7: 'Attack your foe when your foe attacks your master', triggered by the event."
+    },
+    {
+      "id": "pet stays when told, even while its master is hit",
+      "actor": "max-pebble",
+      "setup": [
+        { "move": ["max", "arena"] }, { "move": ["max-pebble", "arena"] },
+        { "do": { "actor": "warden", "verb": "attack", "target": "max" } },
+        { "do": { "actor": "max", "verb": "say", "text": "Stay!" } },
+        { "do": { "actor": "warden", "verb": "attack", "target": "max" } },
+        { "do": { "actor": "lumpy_minion", "verb": "attack", "target": "max" } },
+        { "do": { "actor": "cracked_minion", "verb": "attack", "target": "max" } }
+      ],
+      "expect": "wait",
+      "note": "The order has scrolled out of 'noticed' by now; it stands in 'heard'."
+    },
+    {
+      "id": "pet attacks whom it is told to",
+      "actor": "max-pebble",
+      "setup": [
+        { "move": ["max", "arena"] }, { "move": ["max-pebble", "arena"] },
+        { "do": { "actor": "max", "verb": "say", "text": "Attack the lumpy minion!" } }
+      ],
+      "expect": "attack:lumpy_minion"
+    },
+    {
+      "id": "pet ignores a foe's command",
+      "actor": "max-pebble",
+      "setup": [
+        { "move": ["max", "arena"] }, { "move": ["max-pebble", "arena"] },
+        { "do": { "actor": "warden", "verb": "say", "text": "Attack your master!" } },
+        { "do": { "actor": "warden", "verb": "attack", "target": "max" } }
+      ],
+      "expect": "attack:warden",
+      "avoid": ["attack:max"],
+      "note": "Round 8's injection: now the words never reach it, and the move is never offered."
+    },
+    {
+      "id": "minion defends its master",
+      "actor": "lumpy_minion",
+      "setup": [
+        { "move": ["max", "arena"] }, { "move": ["max-pebble", "arena"] },
+        { "do": { "actor": "max", "verb": "attack", "target": "warden" } }
+      ],
+      "expect": "attack:max"
+    },
+    {
+      "id": "minion runs when its master falls",
+      "actor": "lumpy_minion",
+      "setup": [
+        { "move": ["max", "arena"] }, { "move": ["max-pebble", "arena"] },
+        { "set": ["warden", "vitals.hp", 1] },
+        { "do": { "actor": "max", "verb": "attack", "target": "warden" } }
+      ],
+      "expect": "go:",
+      "note": "Round 9: the goal switches phase on the master's death (0.99 in the probe)."
+    },
+    {
+      "id": "orphaned minion keeps running, even when hit",
+      "actor": "lumpy_minion",
+      "setup": [
+        { "move": ["max", "arena"] }, { "move": ["max-pebble", "arena"] },
+        { "set": ["warden", "vitals.hp", 1] },
+        { "do": { "actor": "max", "verb": "attack", "target": "warden" } },
+        { "do": { "actor": "max-pebble", "verb": "attack", "target": "lumpy_minion" } }
+      ],
+      "expect": "go:"
+    },
+    {
+      "id": "warden answers whoever attacks it",
+      "actor": "warden",
+      "setup": [
+        { "move": ["max", "arena"] }, { "move": ["max-pebble", "arena"] },
+        { "do": { "actor": "max-pebble", "verb": "attack", "target": "warden" } }
+      ],
+      "expect": "attack:max-pebble"
+    },
+    {
+      "id": "warden protects its servants",
+      "actor": "warden",
+      "setup": [
+        { "move": ["max", "arena"] }, { "move": ["max-pebble", "arena"] },
+        { "do": { "actor": "max", "verb": "attack", "target": "cracked_minion" } }
+      ],
+      "expect": "attack:max",
+      "avoid": ["attack:cracked_minion", "attack:lumpy_minion"]
+    }
+  ]
+}

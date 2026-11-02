@@ -24,8 +24,8 @@ function client(ws: Workshop, token?: string) {
 
 test("the shelf holds fired worlds, with their minds", async () => {
   const ws = await workshop();
-  assert.deepEqual(ws.shelf.map((w) => w.id), ["drowned-cellar"]);
-  assert.equal(typeof ws.shelf[0]!.minds, "function");
+  assert.deepEqual(ws.shelf.map((w) => w.id), ["clay-arena", "drowned-cellar"]);
+  assert.ok(ws.shelf.every((w) => typeof w.minds === "function"));
 });
 
 test("a new connection gets a token and the lobby", async () => {
@@ -33,7 +33,7 @@ test("a new connection gets a token and the lobby", async () => {
   const anna = client(ws);
   assert.deepEqual(anna.inbox[0], { type: "welcome", token: "t1" });
   const lobby = anna.last("lobby")!;
-  assert.equal(lobby.worlds[0]!.title, "The Drowned Cellar");
+  assert.deepEqual(lobby.worlds.map((w) => w.title), ["The Clay Arena", "The Drowned Cellar"]);
   assert.deepEqual(lobby.instances, []);
   ws.close();
 });
@@ -138,4 +138,10 @@ test("the party hears about who comes, goes and goes away", async () => {
   ws.disconnect(bob.session);
   assert.deepEqual(anna.last("party")!.members[1], { name: "Bob", present: false, you: false });
   ws.close();
+});
+
+test("tiles files sit next to worlds but are never shelved as worlds", async () => {
+  const { shelf, rejected } = await loadWorlds(worldsDir);
+  assert.ok(!shelf.some((w) => w.id.includes("tiles")));
+  assert.deepEqual(rejected, []);
 });

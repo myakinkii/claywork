@@ -1,5 +1,5 @@
 // Start the world server.
-// Usage: npm start ; env PORT=8080 HOST=127.0.0.1 TICK_MS=2000 DEBUG=all|net,events,intents,golems
+// Usage: npm start ; env PORT=8080 HOST=127.0.0.1 TICK_MS=2500 DEBUG=all|net,events,intents,golems
 import { fileURLToPath } from "node:url";
 import type { AddressInfo } from "node:net";
 import { Workshop, createDebug, loadWorlds, TOPICS } from "@claywork/workshop";
@@ -7,7 +7,7 @@ import { serve } from "./server.ts";
 
 const port = Number(process.env.PORT ?? 8080);
 const host = process.env.HOST ?? "127.0.0.1";
-const tickMs = Number(process.env.TICK_MS ?? 2000);
+const tickMs = Number(process.env.TICK_MS ?? 2500);
 const debug = createDebug(process.env.DEBUG);
 const dir = fileURLToPath(new URL("../../../worlds/", import.meta.url));
 

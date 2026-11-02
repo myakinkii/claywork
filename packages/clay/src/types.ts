@@ -42,6 +42,16 @@ export interface Traits {
     still?: number;
     /** Paying attention to sounds. Lasts while the actor stays still. */
     listening?: boolean;
+    /** Whom this actor serves: its master. Shapes roles (master, servant, ally, foe). */
+    serves?: Id;
+    /** Side in a fight. Default: the master's faction, "players" for players, else "wild". */
+    faction?: string;
+    /** The archetype (Scenario.archetypes) whose mind this actor thinks with. */
+    archetype?: string;
+    /** Joined with a player (Scenario.player.companions) and leaves with them. */
+    companion?: boolean;
+    /** How minds refer to it, when "the" + name won't do: "the Clay Warden". */
+    called?: string;
   };
   vitals?: { hp: number; maxHp: number };
   weapon?: { damage: number };
@@ -84,7 +94,7 @@ export interface Thing {
 // "$actor" (who acts), "$target" (what is acted on).
 // ---------------------------------------------------------------------------
 
-export type Ref = Id | "$actor" | "$target";
+export type Ref = Id | "$actor" | "$target" | "$self" | "$master";
 
 export type Condition =
   | { all: Condition[] }
@@ -103,7 +113,9 @@ export type Condition =
   /** Thing has a trait: { "trait": ["$actor", "mute"] }. */
   | { trait: [thing: Ref, trait: string] }
   /** Actor has stayed still (waited) for at least this many consecutive ticks. */
-  | { still: [actor: Ref, ticks: number] };
+  | { still: [actor: Ref, ticks: number] }
+  /** The thing exists in the world and, if it has vitals, is alive. */
+  | { alive: Ref };
 
 export type Effect =
   /** Narration, optionally with a cut scene. Heard by the room of the actor, or only by the actor. */
@@ -172,6 +184,36 @@ export interface VerbConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Minds: how a golem perceives and decides, as world data. Everything a decision
+// model reads is rendered from the golem's own point of view, in roles.
+// ---------------------------------------------------------------------------
+
+/** How another actor relates to an observer. */
+export type Role = "self" | "master" | "servant" | "ally" | "foe" | "other";
+
+/** A companion template: a thing that joins with each player, with what it carries. */
+export type Companion = Omit<Thing, "location"> & { carrying?: Omit<Thing, "location">[] };
+
+export interface Archetype {
+  /** Who the creature is, in prose. Character words act as strong priors: keep them consistent with the goals. */
+  persona: string;
+  /**
+   * Goals by phase: the first phase whose `when` holds is current; a phase without `when`
+   * is the default. Phases change the creature's situation (its master died), never its choice.
+   * Write goals as single triggers in the options' own words: "Attack whoever attacks your master."
+   */
+  phases: { id: string; when?: Condition; goal: string }[];
+  /** Verbs it considers at all, e.g. ["attack", "go", "wait"]. */
+  repertoire: string[];
+  /** Moves never offered, as verb:role, e.g. "attack:master". Constraints belong in structure, not prose. */
+  forbid?: string[];
+  /** Whose words it hears verbatim. Others' speech arrives as "shouts something". Default: everyone. */
+  hears?: Role[];
+  /** How many noticed events it keeps in mind. Default 4. */
+  memory?: number;
+}
+
+// ---------------------------------------------------------------------------
 // Intents and events. Actors never change the world directly: they submit
 // intents, the wheel resolves them, and publishes events describing what happened.
 // ---------------------------------------------------------------------------
@@ -232,8 +274,13 @@ export interface Scenario {
   verbs?: Record<string, VerbConfig | false>;
   /** The world's sprites, by id. */
   art?: Record<string, Sprite>;
-  /** Template for joining players: extra traits (merged over the defaults) and starting hp. */
-  player?: { traits?: Traits; hp?: number };
+  /** Archetypes by id: the minds world actors think with. */
+  archetypes?: Record<string, Archetype>;
+  /**
+   * Template for joining players: extra traits (merged over the defaults), starting hp, and
+   * companions that join with each player and serve them (ids are prefixed with the player's).
+   */
+  player?: { traits?: Traits; hp?: number; companions?: Companion[] };
   /** When this holds, the scenario is complete. "$actor" is the player. */
   goal?: Condition;
   /** A known solution, used by the Kiln to prove the scenario is winnable. */

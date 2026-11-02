@@ -40,8 +40,10 @@ export interface Verb {
 
 // --- helpers ---------------------------------------------------------------
 
-/** "the iron chest", but "Anna" for capitalized proper names. */
+/** "the iron chest", but "Anna" for capitalized proper names, and an actor's own "called" name. */
 export function the(thing: Thing): string {
+  const called = thing.traits.actor?.called;
+  if (typeof called === "string") return called;
   return /^[A-Z]/.test(thing.name) ? thing.name : `the ${thing.name}`;
 }
 
@@ -76,14 +78,14 @@ function targetOf(ctx: VerbContext): Thing | null {
   return id && ctx.world.has(id) ? ctx.world.get(id) : null;
 }
 
-/** The best weapon an actor carries, or bare hands. */
+/** The best weapon an actor carries (even a weak one is still a weapon), or bare hands. */
 export function weaponOf(world: World, actor: Id): { thing?: Thing; damage: number } {
-  let best: { thing?: Thing; damage: number } = { damage: 1 };
+  let best: { thing: Thing; damage: number } | undefined;
   for (const t of world.carried(actor)) {
-    const damage = t.traits.weapon?.damage ?? 0;
-    if (damage > best.damage) best = { thing: t, damage };
+    const damage = t.traits.weapon?.damage;
+    if (damage !== undefined && (!best || damage > best.damage)) best = { thing: t, damage };
   }
-  return best;
+  return best ?? { damage: 1 };
 }
 
 // --- verbs -----------------------------------------------------------------
@@ -331,12 +333,12 @@ const attack: Verb = {
         text: `${cap(the(who))} hits ${the(t)}${using}.`,
         you: `You hit ${the(t)}${using} for ${weapon.damage}.`,
         them: `${cap(the(who))} hits you${using} for ${weapon.damage}.`,
-        data: { damage: weapon.damage, hp },
+        data: { damage: weapon.damage, hp, ...(weapon.thing ? { weapon: weapon.thing.name } : {}) },
       },
     ];
     if (hp === 0) {
       for (const item of world.children(t.id)) world.move(item.id, world.roomOf(t.id));
-      events.push({ name: "died", scope, actor: t.id, target: t.id, text: `${cap(the(t))} collapses.`, you: "Everything goes dark." });
+      events.push({ name: "died", scope, actor: t.id, target: t.id, text: `${cap(the(t))} collapses.`, you: "Everything goes dark.", data: { by: actor } });
     }
     return { events };
   },

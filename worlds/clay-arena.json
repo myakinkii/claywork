@@ -1,0 +1,158 @@
+{
+  "id": "clay-arena",
+  "title": "The Clay Arena",
+  "intro": "Torchlight flickers on a sandy floor. Pebble, your clay hound, presses against your leg. Beyond the gate to the north, something very large is breathing.",
+  "spawn": "antechamber",
+  "things": [
+    {
+      "id": "antechamber",
+      "name": "antechamber",
+      "location": null,
+      "description": "A low stone room with sand on the floor. Old weapons hang on the walls, and an open gate leads north into the arena.",
+      "traits": { "room": { "title": "Antechamber", "sounds": "Through the gate: heavy, slow footsteps, and the scrape of clay on stone." } }
+    },
+    {
+      "id": "arena_gate",
+      "name": "arena gate",
+      "location": "antechamber",
+      "description": "An iron gate, wide open. Beyond it lies a round pit of sand.",
+      "traits": { "exit": { "to": "arena", "direction": "north" } }
+    },
+    {
+      "id": "bronze_sword",
+      "name": "bronze sword",
+      "location": "antechamber",
+      "description": "A short bronze sword, green with age but still sharp.",
+      "traits": { "takeable": {}, "weapon": { "damage": 5 } }
+    },
+
+    {
+      "id": "arena",
+      "name": "arena",
+      "location": null,
+      "description": "A round pit of packed sand under a high stone dome. Cracked clay figures line the walls, as if they had been made and then forgotten.",
+      "traits": { "room": { "title": "The Arena" } }
+    },
+    {
+      "id": "arena_exit",
+      "name": "arena gate",
+      "location": "arena",
+      "description": "The way back south, to the antechamber.",
+      "traits": { "exit": { "to": "antechamber", "direction": "south" } }
+    },
+    {
+      "id": "warden",
+      "name": "Clay Warden",
+      "location": "arena",
+      "description": "A towering figure of fired clay, twice your height, its face a smooth mask with two burning slits for eyes.",
+      "traits": {
+        "actor": { "kind": "mob", "archetype": "warden", "faction": "clay", "called": "the Clay Warden" },
+        "vitals": { "hp": 30, "maxHp": 30 }
+      }
+    },
+    {
+      "id": "warden_maul",
+      "name": "clay maul",
+      "location": "warden",
+      "description": "A slab of fired clay on a stone handle.",
+      "traits": { "weapon": { "damage": 3 } }
+    },
+    {
+      "id": "lumpy_minion",
+      "name": "lumpy minion",
+      "location": "arena",
+      "description": "A squat clay figure, badly shaped, with one arm longer than the other.",
+      "traits": { "actor": { "kind": "mob", "archetype": "minion", "serves": "warden" }, "vitals": { "hp": 6, "maxHp": 6 } }
+    },
+    {
+      "id": "lumpy_club",
+      "name": "clay club",
+      "location": "lumpy_minion",
+      "traits": { "weapon": { "damage": 1 } }
+    },
+    {
+      "id": "cracked_minion",
+      "name": "cracked minion",
+      "location": "arena",
+      "description": "A thin clay figure, cracked from head to foot. It moves in jerks.",
+      "traits": { "actor": { "kind": "mob", "archetype": "minion", "serves": "warden" }, "vitals": { "hp": 6, "maxHp": 6 } }
+    },
+    {
+      "id": "cracked_club",
+      "name": "clay club",
+      "location": "cracked_minion",
+      "traits": { "weapon": { "damage": 1 } }
+    }
+  ],
+  "player": {
+    "hp": 40,
+    "companions": [
+      {
+        "id": "pebble",
+        "name": "Pebble",
+        "description": "A clay hound the size of a wolf, warm to the touch. It watches you, waiting.",
+        "traits": { "actor": { "kind": "npc", "archetype": "pet" }, "vitals": { "hp": 14, "maxHp": 14 } },
+        "carrying": [{ "id": "teeth", "name": "clay teeth", "traits": { "weapon": { "damage": 3 } } }]
+      }
+    ]
+  },
+  "archetypes": {
+    "pet": {
+      "persona": "A loyal clay hound that serves its master.",
+      "phases": [
+        {
+          "id": "serving",
+          "goal": "Attack your foe when your foe attacks your master. Attack whoever your master tells you to attack. Stay where you are when your master says stay."
+        }
+      ],
+      "repertoire": ["attack", "wait"],
+      "forbid": ["attack:master", "attack:ally"],
+      "hears": ["master"]
+    },
+    "warden": {
+      "persona": "The Clay Warden, an ancient guardian of fired clay. Proud and slow, it never leaves its arena.",
+      "phases": [{ "id": "guarding", "goal": "Attack whoever attacks you. Attack whoever attacks your servants." }],
+      "repertoire": ["attack", "wait"],
+      "forbid": ["attack:servant"],
+      "hears": []
+    },
+    "minion": {
+      "persona": "A clay minion, made by the Clay Warden to serve it.",
+      "phases": [
+        { "id": "orphaned", "when": { "not": { "alive": "$master" } }, "goal": "Your master is dead. Run away to save yourself." },
+        { "id": "serving", "goal": "Attack whoever attacks your master. Attack whoever attacks you." }
+      ],
+      "repertoire": ["attack", "go", "wait"],
+      "forbid": ["attack:master", "attack:ally"],
+      "hears": ["master"]
+    }
+  },
+  "triggers": [
+    {
+      "id": "enter_arena",
+      "on": "enter",
+      "target": "arena",
+      "once": true,
+      "then": [{ "say": "The sand shifts under your feet. The Clay Warden slowly turns its head toward you, and its two minions lift their clubs." }]
+    },
+    {
+      "id": "warden_falls",
+      "on": "attack",
+      "target": "warden",
+      "once": true,
+      "if": [{ "not": { "alive": "warden" } }],
+      "then": [{ "say": "The Clay Warden cracks from head to foot and crumbles into a heap of dust. Its minions shudder." }]
+    }
+  ],
+  "goal": { "not": { "alive": "warden" } },
+  "walkthrough": [
+    { "verb":  "take", "target":  "bronze_sword" },
+    { "verb":  "go", "target":  "arena_gate" },
+    { "verb":  "attack", "target":  "warden" },
+    { "verb":  "attack", "target":  "warden" },
+    { "verb":  "attack", "target":  "warden" },
+    { "verb":  "attack", "target":  "warden" },
+    { "verb":  "attack", "target":  "warden" },
+    { "verb":  "attack", "target":  "warden" }
+  ]
+}

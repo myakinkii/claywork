@@ -1,4 +1,5 @@
-import type { DecisionPoint, GameEvent, Id, Option } from "@claywork/clay";
+import type { DecisionPoint, GameEvent, Id, Option, Thing } from "@claywork/clay";
+import { attentive, mindPolicy, orders, restricted, type MindOptions } from "./mind.ts";
 import { Choice, Noul, Score, getChoice, getNoul, getScore, type Reflex } from "@claywork/reflex";
 import type { Reason } from "@claywork/reason";
 import type { Wheel } from "@claywork/wheel";
@@ -273,29 +274,57 @@ export function playerNearby(wheel: Wheel, actor: Id): boolean {
 }
 
 /**
- * Bring every mob and npc in a world to life: a reflex policy (or the brute when there is
- * no reflex model) with the brute as fallback, and a voice when there is a reason model.
- * Golems are dormant (no model calls at all) unless a player is in the room with them.
- * Returns handles so the caller can stop them all.
+ * Bring every mob and npc in a world to life, including ones that appear later (a player's
+ * companion). Golems with an archetype think with a mind (role-framed perception, attention
+ * decides when to think); others use the older reflex policy. Without a reflex model, rules.
+ * All are dormant unless a player is in the room. Voices only for golems without an
+ * archetype, so speech never crowds out a mind's actions.
+ * Returns the (growing) list of handles so the caller can stop them all.
  */
-export function awaken(wheel: Wheel, minds: Minds = {}, options: Pick<AnimateOptions, "onDecision"> = {}): Animated[] {
+export function awaken(wheel: Wheel, minds: Minds = {}, options: Pick<AnimateOptions, "onDecision"> & Pick<MindOptions, "onView"> = {}): Animated[] {
   const handles: Animated[] = [];
-  for (const thing of wheel.world.things.values()) {
+  const animated = new Set<Id>();
+  const bring = (thing: Thing) => {
     const kind = thing.traits.actor?.kind;
-    if (kind !== "mob" && kind !== "npc") continue;
+    if ((kind !== "mob" && kind !== "npc") || animated.has(thing.id) || thing.location === null) return;
+    animated.add(thing.id);
+    const archetype = thing.traits.actor?.archetype ? wheel.scenario.archetypes?.[thing.traits.actor.archetype] : undefined;
+    const common = {
+      fallback: brute(),
+      deadlineMs: minds.deadlineMs ?? 800,
+      ...(options.onDecision ? { onDecision: options.onDecision } : {}),
+    };
+    if (archetype) {
+      const attention = attentive(wheel, thing.id, archetype);
+      const heard = orders(wheel, thing.id, archetype);
+      // Constraints hold on every path: the mind, its unsure fallback, and the timeout fallback.
+      const safeBrute = restricted(wheel, archetype, brute());
+      const mind = minds.reflex
+        ? mindPolicy(wheel, minds.reflex, archetype, { fallback: safeBrute, heard: heard.current, ...(options.onView ? { onView: options.onView } : {}) })
+        : safeBrute;
+      const policy: Policy = {
+        name: mind.name,
+        decide: async (dp, signal) => {
+          attention.thought();
+          return mind.decide(dp, signal);
+        },
+      };
+      const animated = animate(wheel, thing.id, { ...common, fallback: safeBrute, policy, awake: () => playerNearby(wheel, thing.id) && attention.wants() });
+      handles.push({ ...animated, stop: () => (animated.stop(), heard.stop()) });
+      return;
+    }
     const policy = minds.reflex ? reflexPolicy(minds.reflex, { fallback: brute() }) : brute();
-    handles.push(
-      animate(wheel, thing.id, {
-        policy,
-        fallback: brute(),
-        deadlineMs: minds.deadlineMs ?? 800,
-        awake: () => playerNearby(wheel, thing.id),
-        ...(options.onDecision ? { onDecision: options.onDecision } : {}),
-      }),
-    );
+    handles.push(animate(wheel, thing.id, { ...common, policy, awake: () => playerNearby(wheel, thing.id) }));
     if (minds.reason) {
       handles.push(voice(wheel, thing.id, minds.reason, minds.mutterEvery ? { mutter: { everyTicks: minds.mutterEvery } } : {}));
     }
-  }
+  };
+  for (const thing of wheel.world.things.values()) bring(thing);
+  const newcomers = wheel.onTurn(() => {
+    for (const thing of wheel.world.things.values()) bring(thing);
+  });
+  handles.push({ actor: "*", stats: { decisions: 0, timeouts: 0, errors: 0, fallbacks: 0 }, stop: newcomers });
   return handles;
 }
+
+export { attentive, currentPhase, describe, factionOf, frame, healthWord, mindPolicy, mindQuestion, mindView, noticed, orders, restricted, roleOf, type MindOptions, type MindView } from "./mind.ts";

@@ -13,7 +13,8 @@
     "kiln": "node apps/terminal/src/kiln.ts",
     "play": "node --env-file-if-exists=.env apps/terminal/src/play.ts",
     "start": "node --env-file-if-exists=.env apps/server/src/main.ts",
-    "probe": "node --env-file-if-exists=.env apps/terminal/src/probe.ts"
+    "probe": "node --env-file-if-exists=.env apps/terminal/src/probe.ts",
+    "tiles": "node --env-file-if-exists=.env apps/terminal/src/tiles.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
