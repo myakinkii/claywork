@@ -38,7 +38,8 @@ export function overhear(world: World): Overhear {
           : (echo.muffled ?? "Through the wall, you hear a muffled voice, too faint to make out."),
       );
     }
-    if (listening) return heard(`Through the wall: ${event.text}`);
+    // with something to peek through, what isn't speech is seen rather than heard
+    if (listening) return heard(echo.peek ? `${echo.peek}: ${event.text}` : `Through the wall: ${event.text}`);
     if (LOUD.has(event.name)) return heard("Something thuds against the other side of the wall.");
     return null;
   };

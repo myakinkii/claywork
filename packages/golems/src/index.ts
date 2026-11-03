@@ -348,7 +348,8 @@ export function awaken(wheel: Wheel, minds: Minds = {}, options: Pick<AnimateOpt
           if (busy || inBattle() || !playerPerceives(wheel, thing.id)) return;
           // something it attends to happened, or, failing that, a quiet moment to mutter
           const news = attention.wants();
-          const idle = !news && mutterEvery !== undefined && wheel.tick - lastCalm >= mutterEvery;
+          // muttering is for when it's alone: listeners behind a wall, nobody in the room
+          const idle = !news && mutterEvery !== undefined && wheel.tick - lastCalm >= mutterEvery && !playerNearby(wheel, thing.id);
           if (!news && !idle) return;
           busy = true;
           lastCalm = wheel.tick;

@@ -103,7 +103,10 @@ test("awakened golems sleep until a player is in the room: no model calls for no
   assert.equal(reflex.calls, 0, "Anna is upstairs: the goblin doesn't think");
   wheel.submit({ actor: "anna", verb: "go", target: "stairs_down" });
   await turns(wheel, 3);
-  assert.ok(reflex.calls >= 1, "she came down: now it does");
+  assert.equal(reflex.calls, 0, "she came down, but this goblin talks before it fights");
+  wheel.submit({ actor: "anna", verb: "attack", target: "goblin" });
+  await turns(wheel, 3);
+  assert.ok(reflex.calls >= 1, "she attacked: now it fights");
   wheel.world.grant("anna", "linkdead");
   const before = reflex.calls;
   await turns(wheel, 3);
@@ -164,4 +167,58 @@ test("trapped is a fact in the golem's own sentence, as well as an alert", () =>
   const view = mindView(wheel, "goblin", wheel.scenario.archetypes!.goblin!, wheel.decisionPoint("goblin"));
   assert.match(String(view.state.you), /You are trapped: there is no way out\.$/);
   assert.ok((view.state.alerts as string[]).includes("You are trapped: there is nowhere to run!"));
+});
+
+// --- step 3: talk first, then bribe ----------------------------------------------------------
+
+import { modeOf, roleOf, currentPhase } from "@claywork/golems";
+
+function down() {
+  const wheel = cellar();
+  wheel.join({ id: "anna", name: "Anna" });
+  wheel.world.move("anna", "cellar");
+  const act = (verb: string, target?: string, extra: object = {}) => {
+    wheel.submit({ actor: "anna", verb, ...(target ? { target } : {}), ...extra });
+    return wheel.turn();
+  };
+  return { wheel, act, w: wheel.world, goblin: wheel.scenario.archetypes!.goblin! };
+}
+
+test("this goblin talks before it fights: calm with Anna in reach, battle once attacked", () => {
+  const { wheel, act, goblin } = down();
+  assert.equal(modeOf(wheel, "goblin", goblin), "calm");
+  act("attack", "goblin");
+  assert.equal(modeOf(wheel, "goblin", goblin), "battle");
+});
+
+test("a shiny gift buys a friend; the door is no longer guarded", () => {
+  const { wheel, act, w, goblin } = down();
+  w.move("silver_ring", "anna");
+  const events = act("give", "goblin", { with: "silver_ring" });
+  assert.equal(w.get("silver_ring").location, "goblin");
+  assert.ok(events.some((e) => /bites it, and grins/.test(e.text)));
+  assert.equal(roleOf(w, "goblin", "anna"), "ally", "a friend now, not a foe");
+  assert.equal(currentPhase(w, "goblin", goblin).id, "paid");
+  w.move("rusty_key", "anna");
+  act("unlock", "crypt_door", { with: "rusty_key" });
+  assert.equal(w.prop("crypt_door", "lockable.locked"), false, "it lets its friend pass");
+  void wheel;
+});
+
+test("anything not shiny is tossed into the water", () => {
+  const { act, w } = down();
+  w.move("torch", "anna");
+  const events = act("give", "goblin", { with: "torch" });
+  assert.ok(events.some((e) => /"Not shiny!"/.test(e.text)));
+  assert.equal(w.get("torch").location, "cellar");
+  assert.equal(roleOf(w, "goblin", "anna"), "foe");
+});
+
+test("muttering is only for when it's alone: never to a player's face", async () => {
+  const { wheel } = down();
+  const reason = new FakeReason((req) => (req.system?.includes("mutter to yourself") ? '{"do": "say", "text": "Key in chest."}' : '{"do": "nothing"}'));
+  const handles = awaken(wheel, { reflex: new FakeReflex(), reason });
+  await turns(wheel, 10, 10);
+  for (const h of handles) h.stop();
+  assert.ok(!reason.requests.some((r) => r.system?.includes("mutter to yourself")), "Anna stands right there");
 });

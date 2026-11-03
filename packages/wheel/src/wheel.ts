@@ -250,7 +250,7 @@ export class Wheel {
     if (!verb) return outcome("failed", [say("failed", `You don't know how to ${intent.verb}.`)]);
 
     // Inability is the world's to describe, and comes before any other problem.
-    const glyphCtx = { world, actor, ...(intent.target ? { target: intent.target } : {}) };
+    const glyphCtx = { world, actor, ...(intent.target ? { target: intent.target } : {}), ...(intent.with ? { with: intent.with } : {}) };
     for (const req of this.#requirements.get(verb.name) ?? []) {
       const ok = (!req.if || check(req.if, glyphCtx)) && (!req.unless || !check(req.unless, glyphCtx));
       if (!ok) return outcome("unable", [say("unable", req.fail ?? "You can't do that right now.")]);

@@ -59,7 +59,7 @@ test("quiet things only come through when you listen", () => {
   assert.deepEqual(heard(), []);
   act("anna", "listen");
   act("goblin", "drop", "torch");
-  assert.deepEqual(heard(), ["Through the wall: The goblin drops the torch."]);
+  assert.deepEqual(heard(), ["Through the cracks, you see: The goblin drops the torch."], "the niche has holes to peek through");
 });
 
 test("a carried light makes a dark room visible", () => {
@@ -100,4 +100,14 @@ test("knowledge is part of the world's snapshot", () => {
   const { wheel, act } = setup();
   act("anna", "search");
   assert.deepEqual(wheel.world.snapshot().known, { anna: ["old_shovel", "loose_brick"] });
+});
+
+test("through cracks you can peek: gestures are seen, speech is still heard", () => {
+  const { wheel, act, heard } = setup();
+  wheel.world.setProp("niche", "echo.peek", "Through the cracks, you see");
+  wheel.world.move("anna", "niche");
+  act("anna", "listen");
+  act("goblin", "emote", undefined, { text: "shivers in the dark water" });
+  act("goblin", "say", undefined, { text: "Goblin not scared." });
+  assert.deepEqual(heard().slice(-2), ["Through the cracks, you see: The goblin shivers in the dark water.", 'Through the wall, a voice: "Goblin not scared."']);
 });

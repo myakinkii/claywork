@@ -29,7 +29,7 @@ Ideas, not code yet: **potter** (the LLM that generates scenarios, repaired by k
 - **Intents, not mutations.** Players, rules and models only *submit intents*. The wheel resolves them through **verbs** and publishes **events**. A model can want anything; it can only do what the rules allow.
 - **One decision contract.** A `DecisionPoint` (observation + persona + goal + a closed list of legal options, each with a one-line rule hint) goes to a `Policy`, which returns an option id. Humans, rule bots, Jev-like models and ADK agents are interchangeable.
 - **The wheel never waits.** It turns on a fixed tick. Golems think asynchronously against a deadline; slow or unsure minds fall back to rules.
-- **Worlds are fired before they go live.** Every scenario carries a walkthrough the kiln replays on a real wheel.
+- **Worlds are fired before they go live.** Every scenario carries a walkthrough the kiln replays on a real wheel, plus any other ways to win in `walkthroughs` (in the Drowned Cellar: fighting the goblin, or bribing it), each proven on its own fresh world.
 
 ```
 world (clay) → perception (slip) → decision point → policy (human | rules | reflex | reason)
@@ -96,7 +96,7 @@ A world is a JSON `Scenario` (see `packages/clay/src/types.ts` and `worlds/drown
 
 ## Verbs are part of the world
 
-The engine ships a library of standard verbs (look, go, take, drop, open, close, unlock, attack, say, wait). A world inherits them, and can:
+The engine ships a library of standard verbs (look, search, listen, go, take, drop, give, open, close, unlock, attack, say, emote, wait). A world inherits them, and can:
 
 - **switch them off**: `"attack": false` (a world without violence). Everything except `wait`: letting time pass is the floor every decision stands on;
 - **restrict them**: `requires` conditions on the actor. When unmet, the verb still exists and is still offered, but fails with the world's own words;
@@ -121,6 +121,7 @@ Glyphs can `grant` and `revoke` traits (curses, blessings, a stolen voice), test
 Perception is not all-or-nothing:
 
 - **Sight.** A room with `dark` hides everything unless a lit `light` is somewhere in it (a carried torch counts). In the dark you still feel the exits, and `search` finds things by touch. Each actor remembers what it found (`World.knows`, part of the snapshot). `concealed` things need a search even in light, and `blind` actors never see.
+- **Peeking.** An echo with `peek` ("Through the cracks, you see") lets a listener *see* gestures through the wall, while speech still arrives as a voice.
 - **Hearing.** A room with `echo: { from }` overhears another room: speech arrives muffled, loud things as thuds, quiet things not at all. `listen` makes everything clear, words included (but not who spoke them), for as long as you stay still. Rooms can describe what you hear with `room.sounds`.
 - **Attention is stillness.** `wait` and `listen` both count stillness up and keep you listening; any other action breaks both.
 
@@ -160,11 +161,13 @@ Rules for writing goals (by hand or by the Potter): single triggers in the optio
 
 Like the battle mode of a CRPG, a creature's mind switches with the situation, and the engine decides, never a model: **battle** while a living foe is in reach or an attack it noticed is fresh (3 ticks), **calm** otherwise. In battle the fast System One model picks moves. In calm, a slow language model expresses the creature: an archetype's `calm.goal` and persona go into its instructions, the same role-framed view goes in as the message, and it answers in a fixed JSON shape, `{"do": "emote" | "say" | "nothing", "text": ...}`. The engine validates it: anything malformed, too long, or claiming an action becomes nothing. So the slow brain can only *express*, never act, and speech never competes with an attack again: talking is for calm moments.
 
+An archetype can wait to be attacked before fighting (`"battle": "when-attacked"`), so there is a moment to talk first, and each phase can carry its own calm goal. The Drowned Cellar's goblin uses both: it threatens you and demands something shiny; `give` it the silver ring hidden in the niche and a trigger makes it your friend (its phase becomes "paid", its faction yours, and the door is no longer guarded), and its calm mind dreams of warm boots. Give it something dull and it tosses it into the water. The world decides whether a bribe works; the goblin's voice does the haggling.
+
 `emote` is a standard verb for players too (`emote waves` shows "Max waves."). In the arena you can `pet Pebble`, and Pebble's calm mind answers. A creature's own words and gestures never wake it to think again, and an expression decided in one room is dropped if the creature has moved on (`Intent.where`).
 
 ```bash
 npm run probe:calm     # Pebble's calm mind in six situations (REASON_URL for the real chat model)
-npm run probe:calm -- worlds/drowned-cellar.json   # the goblin, alone, muttering four times
+npm run probe:calm -- worlds/drowned-cellar.json   # the goblin muttering alone, then haggling with Anna
 PROMPT=1 SHOW=1 npm run probe:calm
 ```
 
@@ -204,7 +207,7 @@ Pictures need eyes: in the dark, or blind, you get the words without the art. Ev
 
 ## Next
 
-- Calm actions, starting with fetch: let the calm mind choose real legal moves too (`sit`, `fetch the sword`), validated like everything else.
+- Calm actions, starting with fetch: let the calm mind choose real legal moves too (`sit`, `fetch the sword`), validated like everything else. Then the goblin could judge for itself whether a bribe is enough.
 - System Two steering: a language model that rewrites a golem's goal or phase mid-game, which the fast System One loop then follows.
 - ADK (TypeScript) agents as `Policy` / voice implementations for slow NPCs.
 - Spawning adds mid-fight (a `spawn` effect with creature templates); `awaken` already animates golems that appear later.

@@ -5,6 +5,8 @@ export interface GlyphContext {
   world: World;
   actor?: Id;
   target?: Id;
+  /** The intent's instrument: what is given, the key used. */
+  with?: Id;
   /** For minds: the golem thinking, and its master. "$self" falls back to the actor. */
   self?: Id;
   master?: Id;
@@ -18,6 +20,10 @@ export function resolve(ref: Ref, ctx: GlyphContext): Id {
   if (ref === "$target") {
     if (!ctx.target) throw new Error("$target used outside of a target context");
     return ctx.target;
+  }
+  if (ref === "$with") {
+    if (!ctx.with) throw new Error("$with used, but the intent has no instrument");
+    return ctx.with;
   }
   if (ref === "$self") {
     const self = ctx.self ?? ctx.actor;

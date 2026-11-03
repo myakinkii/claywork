@@ -112,6 +112,11 @@ export function frame(world: World, observer: Id, e: GameEvent): string {
       const s = who(e.actor);
       return sentence(`${s} ${verb(s, "leave")}.`);
     }
+    case "gave": {
+      const s = who(e.actor);
+      const item = typeof e.data?.itemName === "string" ? `the ${e.data.itemName}` : "something";
+      return sentence(`${s} ${verb(s, "give")} ${who(e.target)} ${item}.`);
+    }
     case "emoted": {
       // free text can't be conjugated: always third person, with the actor described by role
       const name = e.actor === observer ? cap(the(world.get(observer))) : cap(who(e.actor));
@@ -284,8 +289,10 @@ export const BATTLE_COOLDOWN = 3;
 export function modeOf(wheel: Wheel, self: Id, archetype: Archetype): "battle" | "calm" {
   if (!archetype.calm) return "battle";
   const { world } = wheel;
-  const foeInReach = world.perceivable(self).some((t) => t.traits.actor && world.isAlive(t.id) && roleOf(world, self, t.id) === "foe");
-  if (foeInReach) return "battle";
+  if (archetype.battle !== "when-attacked") {
+    const foeInReach = world.perceivable(self).some((t) => t.traits.actor && world.isAlive(t.id) && roleOf(world, self, t.id) === "foe");
+    if (foeInReach) return "battle";
+  }
   const recentAttack = wheel.slip.recent(self, 20).some((e) => (e.name === "attacked" || e.name === "died") && e.tick > wheel.tick - BATTLE_COOLDOWN);
   return recentAttack ? "battle" : "calm";
 }
@@ -297,12 +304,17 @@ const CALM_FORMAT = [
   '{"do": "nothing"}',
 ].join("\n");
 
+/** The calm goal right now: the current phase's, if it has one, else the archetype's. */
+export function calmGoal(world: World, self: Id, archetype: Archetype): string {
+  return currentPhase(world, self, archetype).calm ?? archetype.calm!.goal;
+}
+
 /** The slow mind's instructions: persona, calm goal, and the one thing it may do: express itself. */
 export function calmSystem(world: World, self: Id, archetype: Archetype, options: { idle?: boolean } = {}): string {
   return [
     `You are ${the(world.get(self))}, a creature in a text adventure.`,
     `Persona: ${archetype.persona}`,
-    `There is no danger right now. ${archetype.calm!.goal}`,
+    `Nobody is fighting right now. ${calmGoal(world, self, archetype)}`,
     ...(options.idle ? ["Nothing new has happened for a while and nobody is paying attention to you: you may mutter to yourself about what is on your mind."] : []),
     "You only express yourself here: never claim to attack, take, open or move anything.",
     "Keep it to one short sentence, in character. Often the best answer is a small gesture.",
@@ -351,7 +363,7 @@ export async function calmThink(
 ): Promise<{ expression: Expression; raw: string; state: Record<string, unknown> }> {
   const dp = wheel.decisionPoint(self);
   const view = mindView(wheel, self, archetype, dp, options.heard ? { heard: options.heard } : {});
-  const state: Record<string, unknown> = { ...view.state, goal: archetype.calm!.goal };
+  const state: Record<string, unknown> = { ...view.state, goal: calmGoal(wheel.world, self, archetype) };
   delete state.alerts;
   // its own last expressions, so it doesn't repeat itself (they never wake it: see attentive)
   const recently = wheel.slip

@@ -96,3 +96,11 @@ test("art is fired too: shape, colors, references", () => {
   s.art!.huge = { palette: { A: "#000000" }, rows: Array(70).fill("A".repeat(80)) };
   assert.ok(codes(s).includes("art-too-big"));
 });
+
+test("every way to win is proven: a broken bribe path is a crack of its own", () => {
+  const s = cellar();
+  s.walkthroughs!.find((w) => w.id === "bribe")!.steps = s.walkthroughs!.find((w) => w.id === "bribe")!.steps.filter((step) => step.verb !== "give");
+  const crack = fire(s).cracks.find((c) => c.at?.startsWith("walkthrough:bribe"));
+  assert.ok(crack, "without the bribe the door stays guarded");
+  assert.match(crack.message, /goblin hisses/);
+});

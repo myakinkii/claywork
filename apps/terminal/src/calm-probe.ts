@@ -5,7 +5,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadScenario, type Intent, type Scenario } from "@claywork/clay";
-import { Wheel } from "@claywork/wheel";
+import { Wheel, the } from "@claywork/wheel";
 import { calmSystem, calmThink, modeOf, orders, BATTLE_COOLDOWN, type Minds } from "@claywork/golems";
 
 interface Situation {
@@ -55,6 +55,12 @@ const SETS: Record<string, { actor: string; player: { id: string; name: string }
       { id: "alone, muttering (2)", idle: true, continues: true, steps: () => {} },
       { id: "alone, muttering (3)", idle: true, continues: true, steps: () => {} },
       { id: "alone, muttering (4)", idle: true, continues: true, steps: () => {} },
+      // Anna comes down: the goblin talks before it fights
+      { id: "an intruder arrives", steps: (w) => act(w, { actor: "anna", verb: "go", target: "stairs_down" }) },
+      { id: "asked to let her pass", continues: true, steps: (w) => act(w, { actor: "anna", verb: "say", text: "Let me through the door, please." }) },
+      { id: "offered the torch", continues: true, steps: (w) => { w.world.move("torch", "anna"); act(w, { actor: "anna", verb: "give", target: "goblin", with: "torch" }); } },
+      { id: "given the silver ring", continues: true, steps: (w) => { w.world.move("silver_ring", "anna"); act(w, { actor: "anna", verb: "give", target: "goblin", with: "silver_ring" }); } },
+      { id: "its new friend opens the chest", continues: true, steps: (w) => act(w, { actor: "anna", verb: "open", target: "iron_chest" }) },
     ],
   },
 };
@@ -101,7 +107,7 @@ for (const s of set.situations) {
     // a clay hound can't speak: words beyond a bark break its persona
     const speech = actor === "max-pebble" && e?.verb === "say" && e.text.split(/\s+/).length > 3;
     if (speech) talked += 1;
-    const name = w.world.get(actor).name;
+    const name = the(w.world.get(actor)).replace(/^./, (c) => c.toUpperCase());
     console.log(`${s.id} (${mode}, ${Date.now() - started}ms)`);
     console.log(`  reply:  ${r.raw.replace(/\s+/g, " ").slice(0, 180)}`);
     console.log(`  shown:  ${e ? (e.verb === "emote" ? `${name} ${e.text}.` : `${name} says: "${e.text}"`) : "(nothing)"}${speech ? "   <- a clay hound shouldn't talk" : ""}`);

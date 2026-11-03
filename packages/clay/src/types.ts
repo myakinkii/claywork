@@ -20,7 +20,13 @@ export interface Traits {
   /** Not noticed even in light until someone searches. */
   concealed?: {};
   /** Sounds from another room reach this one, muffled unless you listen. */
-  echo?: { from: Id; /** What unclear speech sounds like here. */ muffled?: string };
+  echo?: {
+    from: Id;
+    /** What unclear speech sounds like here. */
+    muffled?: string;
+    /** If set, you can also see through (cracks, holes): what goes before seen events, e.g. "Through the cracks, you see". */
+    peek?: string;
+  };
   /** This actor cannot see. */
   blind?: {};
   /** The player behind this actor has lost their connection; the body stays in the world. */
@@ -94,7 +100,8 @@ export interface Thing {
 // "$actor" (who acts), "$target" (what is acted on).
 // ---------------------------------------------------------------------------
 
-export type Ref = Id | "$actor" | "$target" | "$self" | "$master";
+/** "$with" is the instrument of the intent: the key for unlock, the gift for give. */
+export type Ref = Id | "$actor" | "$target" | "$with" | "$self" | "$master";
 
 export type Condition =
   | { all: Condition[] }
@@ -202,7 +209,18 @@ export interface Archetype {
    * is the default. Phases change the creature's situation (its master died), never its choice.
    * Write goals as single triggers in the options' own words: "Attack whoever attacks your master."
    */
-  phases: { id: string; when?: Condition; goal: string }[];
+  phases: {
+    id: string;
+    when?: Condition;
+    goal: string;
+    /** This phase's calm goal, replacing calm.goal: a paid goblin feels differently from a guarding one. */
+    calm?: string;
+  }[];
+  /**
+   * When battle mode starts: "on-sight" (default) as soon as a living foe is in reach;
+   * "when-attacked" only once an attack happens, so there is a moment to talk first.
+   */
+  battle?: "on-sight" | "when-attacked";
   /** Verbs it considers at all, e.g. ["attack", "go", "wait"]. */
   repertoire: string[];
   /** Moves never offered, as verb:role, e.g. "attack:master". Constraints belong in structure, not prose. */
@@ -297,6 +315,8 @@ export interface Scenario {
   goal?: Condition;
   /** A known solution, used by the Kiln to prove the scenario is winnable. */
   walkthrough?: Omit<Intent, "actor">[];
+  /** Other ways to win (bribing instead of fighting), each proven on its own fresh world. */
+  walkthroughs?: { id: string; steps: Omit<Intent, "actor">[] }[];
 }
 
 // ---------------------------------------------------------------------------

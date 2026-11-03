@@ -29,14 +29,25 @@ const mutters = [
   "If they hit hard, goblin runs. Goblin always runs. Then goblin comes back.",
 ];
 
+const threats = ["Mine! Go away! No shiny, no door!", "Goblin guards door. You pay shiny, or you go.", "Shiny? You have shiny? Show Goblin."];
+const glee = ["Shiny! Goblin rich! Goblin buy boots!", "Friend! Friend passes. Goblin keeps shiny.", "Warm boots... no more cold water. Hehe."];
+
 /** Fresh minds per instance, so every party's goblin keeps its own memory. */
 export default function minds(): Minds {
   const real = reflexFromEnv();
-  let muttered = 0;
-  const fakeVoice = new FakeReason(
-    (req) => (req.system?.includes("mutter to yourself") ? JSON.stringify({ do: "say", text: mutters[muttered++ % mutters.length] }) : '{"do": "nothing"}'),
-    { latencyMs: 300 },
-  );
+  let muttered = 0, threatened = 0, gloated = 0;
+  // a stand-in for the chat model, picking by what the goblin is told and what it just noticed
+  const fakeVoice = new FakeReason((req) => {
+    const say = (text: string) => JSON.stringify({ do: "say", text });
+    if (req.system?.includes("Goblin was paid")) return say(glee[gloated++ % glee.length]!);
+    if (req.system?.includes("mutter to yourself")) return say(mutters[muttered++ % mutters.length]!);
+    let latest = "";
+    try {
+      latest = (JSON.parse(req.messages.at(-1)?.content ?? "{}") as { noticed?: string[] }).noticed?.at(-1) ?? "";
+    } catch {}
+    if (/^Your foe .*(arrives|says)/.test(latest)) return say(threats[threatened++ % threats.length]!);
+    return '{"do": "nothing"}';
+  }, { latencyMs: 300 });
   return {
     reflex: real ?? new FakeReflex({ latencyMs: [60, 300], rules: [instincts] }),
     reason: reasonFromEnv() ?? fakeVoice,

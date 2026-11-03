@@ -361,6 +361,46 @@ const say: Verb = {
   },
 };
 
+/** Hand something you carry to someone in reach: "give the silver ring to the goblin". */
+const give: Verb = {
+  name: "give",
+  summary: "Give something you carry to someone here. What they make of it is up to them.",
+  usage: "give <thing> to <someone>",
+  aliases: ["offer", "hand"],
+  options(world, actor) {
+    const items = world.children(actor);
+    const people = world.perceivable(actor).filter((t) => t.traits.actor && world.isAlive(t.id));
+    return items.flatMap((item) =>
+      people.map((p) => option(actor, "give", p, `give ${item.name} to ${p.traits.actor?.called ?? p.name}`, `Give ${the(item)} to ${the(p)}.`, { with: item.id })),
+    );
+  },
+  check({ world, actor, intent }) {
+    if (!intent.with || !world.has(intent.with) || world.get(intent.with).location !== actor) return "You aren't carrying that.";
+    const to = intent.target && world.has(intent.target) ? world.get(intent.target) : undefined;
+    if (!to || !to.traits.actor || !world.perceivable(actor).some((t) => t.id === to.id)) return "There's no one like that here.";
+    if (!world.isAlive(to.id)) return `${cap(the(to))} can't take anything now.`;
+    return null;
+  },
+  perform({ world, actor, intent }) {
+    const item = world.get(intent.with!);
+    const to = world.get(intent.target!);
+    const who = world.get(actor);
+    world.move(item.id, to.id);
+    return {
+      events: [{
+        name: "gave",
+        scope: roomScope(world, actor),
+        actor,
+        target: to.id,
+        text: `${cap(the(who))} gives ${the(item)} to ${the(to)}.`,
+        you: `You give ${the(item)} to ${the(to)}.`,
+        them: `${cap(the(who))} gives you ${the(item)}.`,
+        data: { item: item.id, itemName: item.name },
+      }],
+    };
+  },
+};
+
 /** A small piece of acting, in the third person: "emote waves" shows "Max waves." */
 const emote: Verb = {
   name: "emote",
@@ -439,4 +479,4 @@ const listen: Verb = {
   },
 };
 
-export const standardVerbs: Verb[] = [look, search, listen, go, take, drop, toggle("open", true), toggle("close", false), unlock, attack, say, emote, wait];
+export const standardVerbs: Verb[] = [look, search, listen, go, take, drop, give, toggle("open", true), toggle("close", false), unlock, attack, say, emote, wait];

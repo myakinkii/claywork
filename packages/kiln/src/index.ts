@@ -1,4 +1,4 @@
-import type { ArtRef, Condition, Effect, Id, Scenario, Sprite, Thing } from "@claywork/clay";
+import type { ArtRef, Condition, Effect, Id, Intent, Scenario, Sprite, Thing } from "@claywork/clay";
 import { flagsRead, references } from "@claywork/glyphs";
 import { Wheel, standardVerbs } from "@claywork/wheel";
 
@@ -154,8 +154,10 @@ export function fire(scenario: Scenario): Firing {
   for (const trig of triggers) {
     if (trig.on !== "enter" && !known.has(trig.on)) error("unknown-verb", `Triggers on "${trig.on}", which is not a verb in this world.`, `trigger:${trig.id}`);
   }
-  for (const [i, step] of (scenario.walkthrough ?? []).entries()) {
-    if (!known.has(step.verb)) error("unknown-verb", `Uses "${step.verb}", which is not a verb in this world.`, `walkthrough:${i + 1}`);
+  for (const path of paths(scenario)) {
+    for (const [i, step] of path.steps.entries()) {
+      if (!known.has(step.verb)) error("unknown-verb", `Uses "${step.verb}", which is not a verb in this world.`, `${path.label}:${i + 1}`);
+    }
   }
 
   for (const [flag, at] of flagsUsed) if (!flagsWritten.has(flag)) error("flag-never-set", `Reads flag "${flag}", which nothing ever sets.`, at);
@@ -199,6 +201,9 @@ export function fire(scenario: Scenario): Firing {
     }
     for (const r of arc.hears ?? []) if (!ROLES.has(r)) error("bad-role", `"${id}" hears "${r}", which is not a role (${[...ROLES].join(", ")}).`, at);
     if (arc.calm && !arc.calm.goal?.trim()) error("empty-calm", `"${id}" has a calm mode with no goal.`, at);
+    if (arc.battle !== undefined && arc.battle !== "on-sight" && arc.battle !== "when-attacked") error("bad-battle", `"${id}" has battle "${arc.battle}"; use "on-sight" or "when-attacked".`, at);
+    if (arc.battle === "when-attacked" && !arc.calm) warn("battle-without-calm", `"${id}" waits to be attacked but has no calm mode, so it is always in battle anyway.`, at);
+    for (const phase of arc.phases ?? []) if (phase.calm && !arc.calm) warn("phase-calm-unused", `Phase "${phase.id}" of "${id}" has a calm goal, but the archetype has no calm mode.`, at);
     // Goals ask for behaviors in the options' words; asking for one the repertoire lacks is a crack.
     for (const phase of arc.phases ?? []) {
       for (const [v, pattern, words] of BEHAVIOR_WORDS) {
@@ -248,10 +253,10 @@ export function fire(scenario: Scenario): Firing {
 
   // --- the walkthrough: does it actually win? --------------------------------
   const structural = cracks.some((c) => c.severity === "error");
-  if (!scenario.walkthrough?.length) {
+  if (!scenario.walkthrough?.length && !scenario.walkthroughs?.length) {
     warn("no-walkthrough", "No walkthrough given, so the scenario is not proven winnable.");
   } else if (!structural) {
-    cracks.push(...simulate(scenario));
+    for (const path of paths(scenario)) cracks.push(...simulate(scenario, path.steps, path.label));
   }
 
   return { ok: !cracks.some((c) => c.severity === "error"), cracks };
@@ -291,7 +296,15 @@ function artIds(ref: ArtRef): string[] {
  * Play the walkthrough on a real wheel, one intent per turn. Other actors stay idle:
  * this proves the puzzle chain is solvable, not that the fights are fair.
  */
-export function simulate(scenario: Scenario): Crack[] {
+/** Every way to win the scenario: the main walkthrough, then the named ones. */
+function paths(scenario: Scenario): { label: string; steps: Omit<Intent, "actor">[] }[] {
+  return [
+    ...(scenario.walkthrough?.length ? [{ label: "walkthrough", steps: scenario.walkthrough }] : []),
+    ...(scenario.walkthroughs ?? []).map((w) => ({ label: `walkthrough:${w.id}`, steps: w.steps })),
+  ];
+}
+
+export function simulate(scenario: Scenario, steps: Omit<Intent, "actor">[] = scenario.walkthrough ?? [], label = "walkthrough"): Crack[] {
   const cracks: Crack[] = [];
   const wheel = new Wheel(scenario);
   const kiln = "__kiln__";
@@ -300,8 +313,8 @@ export function simulate(scenario: Scenario): Crack[] {
   } catch (e) {
     return [{ severity: "error", code: "join-failed", message: `A player could not join: ${(e as Error).message}` }];
   }
-  for (const [i, step] of (scenario.walkthrough ?? []).entries()) {
-    const at = `walkthrough:${i + 1}`;
+  for (const [i, step] of steps.entries()) {
+    const at = `${label}:${i + 1}`;
     let events;
     try {
       wheel.submit({ ...step, actor: kiln });
@@ -319,7 +332,7 @@ export function simulate(scenario: Scenario): Crack[] {
     }
   }
   if (!cracks.length && !wheel.hasWon(kiln)) {
-    cracks.push({ severity: "error", code: "goal-not-reached", message: "The walkthrough completed but the goal was not reached." });
+    cracks.push({ severity: "error", code: "goal-not-reached", message: `The ${label === "walkthrough" ? "walkthrough" : label.replace(":", " ")} completed but the goal was not reached.`, at: label });
   }
   return cracks;
 }

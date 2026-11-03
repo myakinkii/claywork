@@ -119,10 +119,10 @@
       "id": "niche",
       "name": "niche",
       "location": null,
-      "description": "A tight, dry space behind the wall. Thin cracks in the far wall let in a flickering orange light, and someone scratched words into the plaster here.",
+      "description": "A tight, dry space behind the wall. Thin cracks and small holes in the far wall let in a flickering orange light, and someone scratched words into the plaster here. Something glints in a crack in the floor.",
       "traits": {
         "room": { "title": "Narrow Niche", "sounds": "Beyond the cracks: water lapping, a torch hissing, and something shuffling back and forth, back and forth." },
-        "echo": { "from": "cellar", "muffled": "Through the cracks comes a low, muffled voice. You can't make out the words." }
+        "echo": { "from": "cellar", "muffled": "Through the cracks comes a low, muffled voice. You can't make out the words.", "peek": "Through the cracks, you see" }
       }
     },
     {
@@ -130,6 +130,13 @@
       "name": "narrow gap",
       "location": "niche",
       "traits": { "exit": { "to": "stairwell", "direction": "back out" } }
+    },
+    {
+      "id": "silver_ring",
+      "name": "silver ring",
+      "location": "niche",
+      "description": "A tarnished silver ring, wedged in a crack in the floor. It still catches the light.",
+      "traits": { "takeable": {}, "concealed": {}, "shiny": {} }
     },
     {
       "id": "scratched_words",
@@ -479,7 +486,14 @@
   "archetypes": {
     "goblin": {
       "persona": "A cowardly but greedy goblin.",
+      "battle": "when-attacked",
       "phases": [
+        {
+          "id": "paid",
+          "when": { "flag": "goblin_paid" },
+          "goal": "Run away when you are badly hurt. Attack your foe when your foe attacks you.",
+          "calm": "Goblin was paid with a shiny silver ring! Goblin is rich now, and friends with whoever paid. You speak of yourself as \"Goblin\", in short, broken sentences. Goblin dreams of buying warm boots and never standing in cold water again. Goblin lets friends pass through the iron door."
+        },
         {
           "id": "guarding",
           "goal": "Run away when you are badly hurt. Attack your foe when your foe is badly hurt. Attack your foe when you are trapped."
@@ -487,7 +501,7 @@
       ],
       "repertoire": ["attack", "go", "wait"],
       "calm": {
-        "goal": "You guard the iron door, alone in the dark water. You speak of yourself as \"Goblin\", in short, broken sentences. On your mind, and what you mutter about when you think nobody is listening: the rusty key you hid in the heavy iron chest, where nobody ever looks; that Goblin is NOT scared (Goblin is); the warm clay heart behind the iron door, which eats the voice of whoever takes it, the master said; and that when someone hits hard, Goblin always runs, and then comes back. Goblin loves shiny things.",
+        "goal": "You guard the iron door, alone in the dark water. You speak of yourself as \"Goblin\", in short, broken sentences. On your mind, and what you mutter about when you think nobody is listening: the rusty key you hid in the heavy iron chest, where nobody ever looks; that Goblin is NOT scared (Goblin is); the warm clay heart behind the iron door, which eats the voice of whoever takes it, the master said; and that when someone hits hard, Goblin always runs, and then comes back. Goblin loves shiny things. When an intruder is near, you threaten them and demand something shiny: nobody passes the iron door without paying.",
         "mutterEvery": 4
       }
     }
@@ -520,11 +534,33 @@
       ]
     },
     {
+      "id": "goblin_paid",
+      "on": "give",
+      "target": "goblin",
+      "once": true,
+      "if": [{ "trait": ["$with", "shiny"] }],
+      "then": [
+        { "say": "The goblin snatches the shiny thing, bites it, and grins with all its crooked teeth." },
+        { "setFlag": "goblin_paid" },
+        { "set": ["goblin", "actor.faction", "players"] }
+      ]
+    },
+    {
+      "id": "goblin_not_impressed",
+      "on": "give",
+      "target": "goblin",
+      "if": [{ "not": { "trait": ["$with", "shiny"] } }],
+      "then": [
+        { "say": "The goblin sniffs it, scowls, and tosses it into the black water. \"Not shiny!\"" },
+        { "move": ["$with", "cellar"] }
+      ]
+    },
+    {
       "id": "goblin_guards_door",
       "on": "unlock",
       "phase": "before",
       "target": "crypt_door",
-      "if": [{ "prop": ["goblin", "vitals.hp"], "gt": 0 }, { "at": ["goblin", "cellar"] }],
+      "if": [{ "prop": ["goblin", "vitals.hp"], "gt": 0 }, { "at": ["goblin", "cellar"] }, { "not": { "flag": "goblin_paid" } }],
       "then": [
         { "say": "The goblin hisses and shoves you away from the door." },
         { "block": true }
@@ -578,6 +614,27 @@
     }
   ],
   "goal": { "has": ["$actor", "clay_heart"] },
+  "walkthroughs": [
+    {
+      "id": "bribe",
+      "steps": [
+        { "verb": "search" },
+        { "verb": "look", "target": "loose_brick" },
+        { "verb": "go", "target": "niche_passage" },
+        { "verb": "search" },
+        { "verb": "take", "target": "silver_ring" },
+        { "verb": "go", "target": "niche_out" },
+        { "verb": "go", "target": "stairs_down" },
+        { "verb": "give", "target": "goblin", "with": "silver_ring" },
+        { "verb": "open", "target": "iron_chest" },
+        { "verb": "take", "target": "rusty_key" },
+        { "verb": "unlock", "target": "crypt_door", "with": "rusty_key" },
+        { "verb": "open", "target": "crypt_door" },
+        { "verb": "go", "target": "crypt_door" },
+        { "verb": "take", "target": "clay_heart" }
+      ]
+    }
+  ],
   "walkthrough": [
     { "verb": "search" },
     { "verb": "take", "target": "old_shovel" },
